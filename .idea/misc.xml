@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
+  <component name="MavenProjectsManager">
+    <option name="originalFiles">
+      <list>
+        <option value="$PROJECT_DIR$/FServer/pom.xml" />
+        <option value="$PROJECT_DIR$/FServerAccessControl/pom.xml" />
+        <option value="$PROJECT_DIR$/FServerAuth/pom.xml" />
+        <option value="$PROJECT_DIR$/FServerStorage/pom.xml" />
+      </list>
+    </option>
+    <option name="ignoredFiles">
+      <set>
+        <option value="$PROJECT_DIR$/FServer/pom.xml" />
+      </set>
+    </option>
+  </component>
+</project>
