@@ -7,6 +7,17 @@
     <groupId>org.example</groupId>
     <artifactId>FServerStorage</artifactId>
     <version>1</version>
+    <properties>
+        <maven.compiler.source>16</maven.compiler.source>
+        <maven.compiler.target>16</maven.compiler.target>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>com.dropbox.core</groupId>
+            <artifactId>dropbox-core-sdk</artifactId>
+            <version>5.4.5</version>
+        </dependency>
+    </dependencies>
 
     <build>
         <plugins>
