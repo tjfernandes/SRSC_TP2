@@ -1,4 +1,4 @@
-# Running Docker Commands with `docker-compose up -d`
+# Running Script to build and run servers
 
 ## Prerequisites
 
@@ -13,17 +13,14 @@ To run the application using Docker Compose with the `-d` (detached) option, fol
 
 1. **Clone the Repository:**
     ```bash
-    git clone https://github.com/your/repository.git
-    cd repository
+    git clone https://github.com/tjfernandes/SRSC_TP2.git
+    cd SRSC_TP2
     ```
 
-2. **Navigate to the Project Directory:**
-   Change your working directory to the one containing the `docker-compose.yml` file.
-
-3. **Review the `docker-compose.yml` File:**
+2. **Review the `docker-compose.yml` File:**
    Open the `docker-compose.yml` file in a text editor to review the services, configurations, and any environment variables specified.
 
-4. **Build and Run Servers:**
+3. **Build and Run Servers:**
    Execute the following command to execute the script that builds the servers and execute the dockerc-compose.yml file that creates the containers for the servers.
     ```bash
     /bin/bash build_and_run.sh
