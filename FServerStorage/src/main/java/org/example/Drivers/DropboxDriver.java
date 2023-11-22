@@ -1,14 +1,11 @@
-package org.example;
+package org.example.Drivers;
 
 import com.dropbox.core.DbxException;
 import com.dropbox.core.DbxRequestConfig;
 import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.*;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.util.Properties;
 
 public class DropboxDriver {
@@ -39,15 +36,15 @@ public class DropboxDriver {
         return properties;
     }
 
-    public void uploadFile(String localFilePath, String dropboxFilePath) {
+    public void uploadFile(byte[] content, String dropboxFilePath) {
         DbxRequestConfig config = DbxRequestConfig.newBuilder(appName).build();
-        try (InputStream in = new FileInputStream(localFilePath)) {
+        try (InputStream in = new ByteArrayInputStream(content)) {
             DbxClientV2 client = new DbxClientV2(config, accessToken);
             FileMetadata metadata = client.files()
-                    .uploadBuilder(basePath+dropboxFilePath)
+                    .uploadBuilder(basePath + dropboxFilePath)
                     .withMode(WriteMode.ADD)
                     .uploadAndFinish(in);
-            System.out.println("File uploaded: " + metadata.getPathDisplay());
+            System.out.println("File uploaded to Dropbox: " + metadata.getPathDisplay());
         } catch (IOException | DbxException e) {
             e.printStackTrace();
         }
@@ -64,15 +61,17 @@ public class DropboxDriver {
         }
     }
 
-    public void downloadFile(String dropboxFilePath, String localFilePath) {
+    public byte[] downloadFile(String dropboxFilePath) {
         DbxRequestConfig config = DbxRequestConfig.newBuilder(appName).build();
-        try (FileOutputStream outputStream = new FileOutputStream(localFilePath)) {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             DbxClientV2 client = new DbxClientV2(config, accessToken);
-            client.files().download(basePath+dropboxFilePath)
+            client.files().download(basePath + dropboxFilePath)
                     .download(outputStream);
-            System.out.println("File downloaded to: " + localFilePath);
+            System.out.println("File downloaded from Dropbox: " + dropboxFilePath);
+            return outputStream.toByteArray();
         } catch (IOException | DbxException e) {
             e.printStackTrace();
+            return new byte[0];
         }
     }
 

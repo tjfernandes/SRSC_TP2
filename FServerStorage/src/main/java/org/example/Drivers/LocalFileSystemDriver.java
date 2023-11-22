@@ -1,9 +1,6 @@
-package org.example;
+package org.example.Drivers;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -29,8 +26,8 @@ public class LocalFileSystemDriver {
         return properties;
     }
 
-    public void uploadFile(String localFilePath, String targetFilePath) {
-        try (InputStream in = new FileInputStream(localFilePath);
+    public void uploadFile(byte[] fileContent, String targetFilePath) {
+        try (ByteArrayInputStream in = new ByteArrayInputStream(fileContent);
              FileOutputStream out = new FileOutputStream(basePath + targetFilePath)) {
             byte[] buffer = new byte[1024];
             int bytesRead;
@@ -43,6 +40,7 @@ public class LocalFileSystemDriver {
         }
     }
 
+
     public void createFolder(String path) {
         Path folderPath = Path.of(basePath + path);
         try {
@@ -53,14 +51,13 @@ public class LocalFileSystemDriver {
         }
     }
 
-    public void downloadFile(String filePath, String localFilePath) {
+    public byte[] downloadFile(String filePath) {
         Path sourcePath = Path.of(basePath + filePath);
-        Path targetPath = Path.of(localFilePath);
         try {
-            Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("File downloaded to: " + targetPath.toString());
+            return Files.readAllBytes(sourcePath);
         } catch (IOException e) {
             e.printStackTrace();
+            return null;
         }
     }
 
