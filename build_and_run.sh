@@ -19,5 +19,5 @@ cp target/CommandApp-1.jar ../
 cd ..
 docker-compose up -d
 
-java --module-path /Users/tjfernandes/Documents/Java/javafx-sdk-17.0.9/lib --add-modules javafx.controls,javafx.fxml -jar CommandApp-1.jar
+java --module-path lib --add-modules javafx.controls,javafx.fxml -jar CommandApp-1.jar
 
