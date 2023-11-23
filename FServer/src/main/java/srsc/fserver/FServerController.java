@@ -36,7 +36,7 @@ public class FServerController {
             @RequestParam(name = "username") String username,
             @RequestParam(name = "path", defaultValue = "") String path
     ) {
-       return ResponseEntity.ok(storageService.listPath(path));
+       return ResponseEntity.ok(storageService.listPath(username, path));
     }
 
     @PostMapping("/mkdir")
@@ -65,7 +65,7 @@ public class FServerController {
         return ResponseEntity.ok(storageService.getFile(username, file));
     }
 
-    @PostMapping("/cp")
+    @PutMapping("/cp")
     public ResponseEntity<Void> copyFile(
             @RequestParam(name = "username") String username,
             @RequestParam(name = "srcFile") String srcFile,
