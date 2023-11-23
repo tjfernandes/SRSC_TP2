@@ -9,18 +9,14 @@ import java.util.concurrent.ExecutionException;
 @Service
 public class StorageService {
 
-    private final WebSocketClientService webSocketClientService;
 
-    public StorageService(WebSocketClientService webSocketClientService) {
-        this.webSocketClientService = webSocketClientService;
-    }
 
     public String listPath(String username, String path) {
-        try {
-            webSocketClientService.connectToServer(Servers.F_SERVER_STORAGE.name(), String.format("ls %s %s", username, path));
-        } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+//        try {
+//            webSocketClientService.connectToServer(Servers.F_SERVER_STORAGE.name(), String.format("ls %s %s", username, path));
+//        } catch (ExecutionException | InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
         return "listed" + path;
     }
 
