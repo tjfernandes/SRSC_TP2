@@ -5,9 +5,11 @@ import com.sun.net.httpserver.*;
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -64,7 +66,12 @@ public class MainDispatcher {
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the login page!";
+            String query = exchange.getRequestURI().getQuery();
+            Map<String, String> queryParams = parseQueryParams(query);
+
+            String username = queryParams.get("username");
+            String password = queryParams.get("password");
+            String response = "Username: " + username + "\nPassword: " + password;
             exchange.sendResponseHeaders(200, response.length());
             OutputStream os = exchange.getResponseBody();
             os.write(response.getBytes());
@@ -154,6 +161,12 @@ public class MainDispatcher {
             os.write(response.getBytes());
             os.close();
         }
+    }
+
+    private static Map<String, String> parseQueryParams(String query) {
+        return java.util.Arrays.stream(query.split("&"))
+                .map(s -> s.split("="))
+                .collect(java.util.stream.Collectors.toMap(a -> a[0], a -> a.length > 1 ? a[1] : ""));
     }
 
 }

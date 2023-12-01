@@ -1,79 +1,64 @@
 package org.example;
 
-import javafx.application.Application;
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.VBox;
-import javafx.scene.text.Text;
-import javafx.stage.Stage;
-
-import java.io.BufferedReader;
+import java.awt.event.*;
+import javax.swing.*;
+import java.awt.*;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
-import java.util.prefs.Preferences;
 
-public class RemoteFileSystemApp extends Application {
+public class RemoteFileSystemApp extends JFrame {
 
     public static void main(String[] args) {
-        launch(args);
+        JFrame frame = new JFrame("Remote FS");
+        frame.setSize(800, 400);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(35, 35, 35, 35));
+
+        JLabel inputInstruction = new JLabel("Enter your command");
+        JTextField commandTextField = new JTextField();
+        JTextArea outputText = new JTextArea();
+        outputText.setLineWrap(true);
+        outputText.setWrapStyleWord(true);
+        outputText.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(outputText);
+        scrollPane.setPreferredSize(new Dimension(750, 300));
+
+        JButton requestButton = getjButton(commandTextField, outputText);
+
+        panel.add(inputInstruction);
+        panel.add(commandTextField);
+        panel.add(requestButton);
+        panel.add(scrollPane);
+
+        frame.add(panel);
+        frame.setVisible(true);
     }
 
-    @Override
-    public void start(Stage stage) throws Exception {
-        stage.setTitle("Remote FS");
-
-        stage.setOpacity(0.95);
-
-
-        Text inputInstruction = new Text("Enter your command");
-        TextField commandTextField = new TextField();
-        Text outputText = new Text();
-        outputText.setWrappingWidth(750);
-        Button requestButton = new Button("Request");
-
-        requestButton.setOnAction(e -> {
-            String command = commandTextField.getText();
-            String response = "";
-            try {
-                response = requestCommand(command);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
+    private static JButton getjButton(JTextField commandTextField, JTextArea outputText) {
+        JButton requestButton = new JButton("Request");
+        requestButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String command = commandTextField.getText();
+                String response = "";
+                try {
+                    response = requestCommand(command);
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
+                outputText.append(response + "\n");
+                commandTextField.setText("");
             }
-            outputText.setText(response + "\n");
-            commandTextField.clear();
         });
-
-        VBox outputBox = new VBox(10);
-        outputBox.setStyle("-fx-background-color: white;");
-
-        ScrollPane scrollPane = new ScrollPane(outputText);
-        scrollPane.setFitToWidth(true); // Allow horizontal scrolling if needed
-        scrollPane.setPrefHeight(300);
-        scrollPane.setPadding(new Insets(10));
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        outputBox.getChildren().add(scrollPane);
-
-        VBox layout = new VBox(10);
-        layout.setPadding(new Insets(35));
-        layout.getChildren().addAll(inputInstruction, commandTextField, requestButton, outputBox);
-
-
-        Scene scene = new Scene(layout, 800, 400);
-
-        stage.setScene(scene);
-
-        stage.show();
+        return requestButton;
     }
 
-    private String requestCommand(String command) throws IOException {
+
+    private static String requestCommand(String command) throws IOException {
 
         String baseUrl = "https://localhost:8080/api";
 
@@ -95,8 +80,8 @@ public class RemoteFileSystemApp extends Application {
                 String encodedUsername = URLEncoder.encode(username, StandardCharsets.UTF_8);
                 String encodedPassword = URLEncoder.encode(password, StandardCharsets.UTF_8);
 
-                //url = baseUrl + "/login?username=" + encodedUsername + "&password=" + encodedPassword;
-                url = baseUrl + "/login";
+                url = baseUrl + "/login?username=" + encodedUsername + "&password=" + encodedPassword;
+                //url = baseUrl + "/login";
 
                 response = HttpUtils.makeHttpRequest(url, "POST", null);
 
