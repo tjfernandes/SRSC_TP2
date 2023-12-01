@@ -5,13 +5,8 @@ import com.sun.net.httpserver.*;
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.net.URLDecoder;
 import java.security.KeyStore;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class MainDispatcher {
 
@@ -33,7 +28,9 @@ public class MainDispatcher {
 
         server.setExecutor(null);
         server.start();
+
         System.out.println("Server started on port " + port);
+
     }
 
     private static HttpsServer createHttpsServer(int port) throws Exception {
@@ -71,11 +68,46 @@ public class MainDispatcher {
 
             String username = queryParams.get("username");
             String password = queryParams.get("password");
+
+            requestToServer("FServerStorage", 8083);
+
+
             String response = "Username: " + username + "\nPassword: " + password;
             exchange.sendResponseHeaders(200, response.length());
             OutputStream os = exchange.getResponseBody();
             os.write(response.getBytes());
             os.close();
+        }
+    }
+
+    private static requestToServer(String serverName, int port) {
+        try {
+            // Load your keystore and truststore here
+            System.setProperty("javax.net.ssl.keyStore", "client-keystore.jks");
+            System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
+            System.setProperty("javax.net.ssl.trustStore", "trustedstore")
+//            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+
+            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
+
+            // Communication logic with the server
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+            // Example message to send
+            String message = "Hello, Server!";
+            writer.write(message);
+            writer.newLine();
+            writer.flush();
+
+            // Read the server's response
+            String response = reader.readLine();
+            System.out.println("Server response: " + response);
+
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
