@@ -1,17 +1,22 @@
 package org.example;
 
-import com.dropbox.core.DbxException;
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.Crypto.Utils;
-import org.example.Drivers.DropboxDriver;
 import org.example.Drivers.LocalFileSystemDriver;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
+
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 
 public class Main {
 
@@ -76,7 +81,7 @@ public class Main {
         fs.uploadFile(Utils.toHex(encryptedContent).getBytes(), uploadTargetPath);
 
         // Download the file content as a byte array
-        byte[] downloadedContent = fs.downloadFile(uploadTargetPath);
+        //byte[] downloadedContent = fs.downloadFile(uploadTargetPath);
 
         // Decrypt the downloaded content
         byte[] decryptedContent;
@@ -139,6 +144,5 @@ public class Main {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
     }
 }
