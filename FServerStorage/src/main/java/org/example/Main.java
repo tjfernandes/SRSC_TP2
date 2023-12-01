@@ -5,18 +5,13 @@ import org.example.Crypto.CryptoStuff;
 import org.example.Crypto.Utils;
 import org.example.Drivers.LocalFileSystemDriver;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
-import javax.net.ssl.SSLSocket;
+import javax.net.ssl.*;
 
 public class Main {
 
@@ -102,33 +97,39 @@ public class Main {
 
     public static void main(String[] args) {
         try {
-            // Load your keystore and truststore here
-            System.setProperty("javax.net.ssl.keyStore", "src/main/java/server-keystore.jks");
-            System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
-            System.setProperty("javax.net.ssl.trustStore", "src/main/java/trustedstore");
-            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+            // Load your keystore and truststore here;
+            KeyStore ks = KeyStore.getInstance("JKS");
+            try (InputStream is = Main.class.getResourceAsStream("/storage-keystore.jks")) {
+                ks.load(is, "your_storage_keystore_password".toCharArray());
+            }
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, "your_storage_keystore_password".toCharArray());
 
-            SSLServerSocketFactory sslServerSocketFactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+            // SSLContext
+            SSLContext sc = SSLContext.getInstance("TLS");
+            sc.init(kmf.getKeyManagers(), null, null);
+
+            SSLServerSocketFactory sslServerSocketFactory = sc.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8084);
 
-            System.out.println("Server is listening on port 8084...");
+            System.out.println("Server is listening on port 8083...");
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
 
                 // Handle client communication in a separate thread
-                new Thread(() -> handleClient(clientSocket)).start();
+                new Thread(() -> handleClient(clientSocket, serverSocket)).start();
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static void handleClient(SSLSocket socket) {
+    private static void handleClient(SSLSocket clientSocket, SSLServerSocket serverSocket) {
         try {
             // Communication logic with the client
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 
             String message;
             while ((message = reader.readLine()) != null) {
@@ -140,9 +141,13 @@ public class Main {
                 writer.flush();
             }
 
-            socket.close();
+            writer.close();
+            reader.close();
+            clientSocket.close();
+            serverSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
 }

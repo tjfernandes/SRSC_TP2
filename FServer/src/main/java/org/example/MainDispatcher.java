@@ -33,13 +33,23 @@ public class MainDispatcher {
 
         try {
             // Load your keystore and truststore here
-            System.setProperty("javax.net.ssl.keyStore", "client-keystore.jks");
-            System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
-            System.setProperty("javax.net.ssl.trustStore", "trustedstore");
-            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            try (InputStream is = MainDispatcher.class.getResourceAsStream("/truststore")) {
+                trustStore.load(is, "your_client_truststore_password".toCharArray());
+            }
+
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
+            trustManagerFactory.init(trustStore);
+
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
+
 
             SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("0.0.0.0", 8083);
+            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
+
+            socket.startHandshake();
 
             // Communication logic with the server
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
