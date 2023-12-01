@@ -95,19 +95,39 @@ public class Main {
 
     }
 
+    private static final String SIG_SCHEME_STR =
+            "rsa_pkcs1_sha256,rsa_pss_rsae_sha256,rsa_pss_pss_sha256," +
+                    "ed448,ed25519,ecdsa_secp256r1_sha256";
+
     public static void main(String[] args) {
+        System.setProperty("jdk.tls.client.SignatureSchemes", SIG_SCHEME_STR);
+        System.setProperty("jdk.tls.server.SignatureSchemes", SIG_SCHEME_STR);
+
         try {
             // Load your keystore and truststore here;
+            char[] keyStorePassword = "your_storage_keystore_password".toCharArray();
+            char[] keyPassword = "your_storage_key_password".toCharArray();
+
             KeyStore ks = KeyStore.getInstance("JKS");
-            try (InputStream is = Main.class.getResourceAsStream("/storage-keystore.jks")) {
-                ks.load(is, "your_storage_keystore_password".toCharArray());
+            try (InputStream is = Main.class.getResourceAsStream("/storage-keystore")) {
+                System.out.println("ENCONTROU keystore");
+                ks.load(is, keyStorePassword);
             }
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, "your_storage_keystore_password".toCharArray());
+            kmf.init(ks, keyStorePassword);
+
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            try (InputStream is = Main.class.getResourceAsStream("/trustedstore")) {
+                System.out.println("ENCONTROU TRUSTSTORE");
+                trustStore.load(is, "your_client_truststore_password".toCharArray());
+            }
+
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(trustStore);
 
             // SSLContext
             SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(kmf.getKeyManagers(), null, null);
+            sc.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
 
             SSLServerSocketFactory sslServerSocketFactory = sc.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8084);

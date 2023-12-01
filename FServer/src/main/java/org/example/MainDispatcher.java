@@ -10,7 +10,13 @@ import java.util.Map;
 
 public class MainDispatcher {
 
+    private static final String SIG_SCHEME_STR =
+            "rsa_pkcs1_sha256,rsa_pss_rsae_sha256,rsa_pss_pss_sha256," +
+                    "ed448,ed25519,ecdsa_secp256r1_sha256";
+
     public static void main(String[] args) throws Exception {
+        System.setProperty("jdk.tls.client.SignatureSchemes", SIG_SCHEME_STR);
+        System.setProperty("jdk.tls.server.SignatureSchemes", SIG_SCHEME_STR);
 
         int port = 8080;
 
@@ -35,11 +41,12 @@ public class MainDispatcher {
             // Load your keystore and truststore here
 
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            try (InputStream is = MainDispatcher.class.getResourceAsStream("/truststore")) {
+            try (InputStream is = MainDispatcher.class.getResourceAsStream("/trustedstore")) {
+                System.out.println("ENCONTROU TRUSTSTORE");
                 trustStore.load(is, "your_client_truststore_password".toCharArray());
             }
 
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
             SSLContext sslContext = SSLContext.getInstance("TLS");
@@ -48,6 +55,8 @@ public class MainDispatcher {
 
             SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
             SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
+
+
 
             socket.startHandshake();
 

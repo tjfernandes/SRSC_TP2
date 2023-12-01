@@ -1,11 +1,5 @@
 version: '3'
 services:
-  fserver-service:
-    build:
-      context: ./FServer
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
 
   fserver-auth-service:
     build:
@@ -27,3 +21,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8083:8083"
+
+  fserver-service:
+    build:
+      context: ./FServer
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"

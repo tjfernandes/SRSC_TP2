@@ -58,4 +58,4 @@ cp target/CommandApp-1.jar ../
 cd ..
 docker-compose up -d
 
-java -jar CommandApp-1.jar
+# java -jar CommandApp-1.jar
