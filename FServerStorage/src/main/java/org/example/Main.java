@@ -105,13 +105,13 @@ public class Main {
             // Load your keystore and truststore here
             System.setProperty("javax.net.ssl.keyStore", "src/main/java/server-keystore.jks");
             System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
-            System.setProperty("javax.net.ssl.trustStore", "src/main/java/server.crt");
+            System.setProperty("javax.net.ssl.trustStore", "src/main/java/trustedstore");
             System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
 
             SSLServerSocketFactory sslServerSocketFactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
-            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8080);
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8084);
 
-            System.out.println("Server is listening on port 8080...");
+            System.out.println("Server is listening on port 8084...");
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();

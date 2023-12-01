@@ -31,6 +31,34 @@ public class MainDispatcher {
 
         System.out.println("Server started on port " + port);
 
+        try {
+            // Load your keystore and truststore here
+            System.setProperty("javax.net.ssl.keyStore", "client-keystore.jks");
+            System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
+            System.setProperty("javax.net.ssl.trustStore", "trustedstore")
+            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+
+            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket(8084);
+
+            // Communication logic with the server
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+            // Example message to send
+            String message = "Hello, Server!";
+            writer.write(message);
+            writer.newLine();
+            writer.flush();
+
+            // Read the server's response
+            String response = reader.readLine();
+            System.out.println("Server response: " + response);
+
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static HttpsServer createHttpsServer(int port) throws Exception {
@@ -86,10 +114,10 @@ public class MainDispatcher {
             System.setProperty("javax.net.ssl.keyStore", "client-keystore.jks");
             System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
             System.setProperty("javax.net.ssl.trustStore", "trustedstore")
-//            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
 
             SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
+            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket(8084);
 
             // Communication logic with the server
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
