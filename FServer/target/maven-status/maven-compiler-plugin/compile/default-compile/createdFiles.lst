@@ -1,9 +1,0 @@
-org/example/MainDispatcher$PutHandler.class
-org/example/MainDispatcher$ListHandler.class
-org/example/MainDispatcher$CopyHandler.class
-org/example/MainDispatcher$GetHandler.class
-org/example/MainDispatcher$LoginHandler.class
-org/example/MainDispatcher$MakeDirHandler.class
-org/example/MainDispatcher$FileHandler.class
-org/example/MainDispatcher$RemoveHandler.class
-org/example/MainDispatcher.class
