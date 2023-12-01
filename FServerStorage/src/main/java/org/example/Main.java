@@ -1,17 +1,22 @@
 package org.example;
 
-import com.dropbox.core.DbxException;
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.Crypto.Utils;
-import org.example.Drivers.DropboxDriver;
 import org.example.Drivers.LocalFileSystemDriver;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
+
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 
 public class Main {
 
@@ -39,7 +44,7 @@ public class Main {
 
     }
 
-    public static void main(String[] args) throws DbxException {
+    public void test() {
         String cryptoConfigFilePath = "src/main/java/crypto-config.properties";
         String inputFilePath = "src/main/java/ola.txt";
         String uploadTargetPath = "ola.txt";
@@ -76,7 +81,7 @@ public class Main {
         fs.uploadFile(Utils.toHex(encryptedContent).getBytes(), uploadTargetPath);
 
         // Download the file content as a byte array
-        byte[] downloadedContent = fs.downloadFile(uploadTargetPath);
+        //byte[] downloadedContent = fs.downloadFile(uploadTargetPath);
 
         // Decrypt the downloaded content
         byte[] decryptedContent;
@@ -87,11 +92,57 @@ public class Main {
             return;
         }
 
-// Convert decrypted content to hex byte array
+        // Convert decrypted content to hex byte array
         byte[] decryptedHexByteArray = Utils.bytesToHexByteArray(decryptedContent);
 
-// Print the decrypted content as hex byte array
+        // Print the decrypted content as hex byte array
         System.out.println("Decrypted (Hex Byte Array): " + Utils.toHex(decryptedHexByteArray));
 
+    }
+
+    public static void main(String[] args) {
+        try {
+            // Load your keystore and truststore here
+            System.setProperty("javax.net.ssl.keyStore", "src/main/java/server-keystore.jks");
+            System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
+            System.setProperty("javax.net.ssl.trustStore", "src/main/java/server.crt");
+            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+
+            SSLServerSocketFactory sslServerSocketFactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8080);
+
+            System.out.println("Server is listening on port 8080...");
+
+            while (true) {
+                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+
+                // Handle client communication in a separate thread
+                new Thread(() -> handleClient(clientSocket)).start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void handleClient(SSLSocket socket) {
+        try {
+            // Communication logic with the client
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+            String message;
+            while ((message = reader.readLine()) != null) {
+                System.out.println("Received message: " + message);
+
+                // Example response
+                writer.write("Server received your message: " + message);
+                writer.newLine();
+                writer.flush();
+            }
+
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
