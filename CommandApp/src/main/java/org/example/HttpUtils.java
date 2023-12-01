@@ -13,7 +13,7 @@ public class HttpUtils {
 
     static {
         // Create a custom trust manager that trusts all certificates
-        TrustManager[] trustAllCerts = new TrustManager[]{
+        TrustManager[] trustAllCerts = new TrustManager[] {
                 new X509TrustManager() {
                     public java.security.cert.X509Certificate[] getAcceptedIssuers() {
                         return null;
@@ -40,18 +40,7 @@ public class HttpUtils {
         StringBuilder response = new StringBuilder();
 
         try {
-            URL serverURL = new URL(urlString);
-            HttpsURLConnection connection = (HttpsURLConnection) serverURL.openConnection();
-
-            // Set up the request method, timeouts, etc. BEFORE connecting
-            connection.setRequestMethod(requestType);
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-
-            // Set the Authorization header with the JWT token
-            if (jwtToken != null) {
-                connection.setRequestProperty("Authorization", "Bearer " + jwtToken);
-            }
+            HttpsURLConnection connection = getHttpsURLConnection(urlString, requestType, jwtToken);
 
             // Get the response
             try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
@@ -68,5 +57,21 @@ public class HttpUtils {
         }
 
         return response.toString();
+    }
+
+    private static HttpsURLConnection getHttpsURLConnection(String urlString, String requestType, String jwtToken) throws IOException {
+        URL serverURL = new URL(urlString);
+        HttpsURLConnection connection = (HttpsURLConnection) serverURL.openConnection();
+
+        // Set up the request method, timeouts, etc. BEFORE connecting
+        connection.setRequestMethod(requestType);
+        connection.setConnectTimeout(5000);
+        connection.setReadTimeout(5000);
+
+        // Set the Authorization header with the JWT token
+        if (jwtToken != null) {
+            connection.setRequestProperty("Authorization", "Bearer " + jwtToken);
+        }
+        return connection;
     }
 }
