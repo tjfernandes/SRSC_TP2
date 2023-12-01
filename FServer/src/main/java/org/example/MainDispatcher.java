@@ -35,11 +35,11 @@ public class MainDispatcher {
             // Load your keystore and truststore here
             System.setProperty("javax.net.ssl.keyStore", "client-keystore.jks");
             System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
-            System.setProperty("javax.net.ssl.trustStore", "trustedstore")
+            System.setProperty("javax.net.ssl.trustStore", "trustedstore");
             System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
 
             SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket(8084);
+            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("0.0.0.0", 8083);
 
             // Communication logic with the server
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -97,8 +97,6 @@ public class MainDispatcher {
             String username = queryParams.get("username");
             String password = queryParams.get("password");
 
-            requestToServer("FServerStorage", 8083);
-
 
             String response = "Username: " + username + "\nPassword: " + password;
             exchange.sendResponseHeaders(200, response.length());
@@ -108,16 +106,16 @@ public class MainDispatcher {
         }
     }
 
-    private static requestToServer(String serverName, int port) {
+    private static void requestToServer(String serverName, int port) {
         try {
             // Load your keystore and truststore here
             System.setProperty("javax.net.ssl.keyStore", "client-keystore.jks");
             System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
-            System.setProperty("javax.net.ssl.trustStore", "trustedstore")
+            System.setProperty("javax.net.ssl.trustStore", "trustedstore");
             System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
 
             SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket(8084);
+            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
 
             // Communication logic with the server
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
