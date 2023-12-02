@@ -1,12 +1,21 @@
 package org.example;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Enumeration;
 import java.security.cert.Certificate;
+import org.example.Crypto.*;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 import javax.net.ssl.*;
+
+import org.example.Drivers.LocalFileSystemDriver;
 
 public class Main {
 
@@ -42,20 +51,15 @@ public class Main {
     public void cpCommand() {
 
     }
-/*
-    public void test() {
+
+    public static void test() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
         String cryptoConfigFilePath = "src/main/java/crypto-config.properties";
         String inputFilePath = "src/main/java/ola.txt";
         String uploadTargetPath = "ola.txt";
 
         // Create an instance of CryptoStuff
         CryptoStuff crypto = null;
-        try {
-            crypto = new CryptoStuff(cryptoConfigFilePath);
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-            return;
-        }
+        crypto = CryptoStuff.getInstance();
 
         // Read the file content as a byte array
         byte[] fileContent;
@@ -69,7 +73,10 @@ public class Main {
         // Encrypt the file content
         byte[] encryptedContent;
         try {
-            encryptedContent = crypto.encrypt(fileContent);
+            KeyGenerator kg = KeyGenerator.getInstance("AES");
+            kg.init(256);
+            SecretKey key = kg.generateKey();
+            encryptedContent = crypto.encrypt(key, fileContent);
         } catch (CryptoException e) {
             e.printStackTrace();
             return;
@@ -85,7 +92,10 @@ public class Main {
         // Decrypt the downloaded content
         byte[] decryptedContent;
         try {
-            decryptedContent = crypto.decrypt(encryptedContent);
+            KeyGenerator kg = KeyGenerator.getInstance("AES");
+            kg.init(256);
+            SecretKey key = kg.generateKey();
+            decryptedContent = crypto.decrypt(key, encryptedContent);
         } catch (CryptoException e) {
             e.printStackTrace();
             return;
@@ -98,9 +108,18 @@ public class Main {
         System.out.println("Decrypted (Hex Byte Array): " + Utils.toHex(decryptedHexByteArray));
 
     }
- */
+ 
     public static void main(String[] args) {
-       initTLSSocket();
+       //initTLSSocket();
+       try {
+        test();
+    } catch (NoSuchAlgorithmException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    } catch (InvalidAlgorithmParameterException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    }
     }
 
     private static void initTLSSocket(){
