@@ -97,17 +97,16 @@ public class Main {
         String[] confprotocols={"TLSv1.2"};
 
         try {
-            // Load your keystore and truststore here;
             char[] keyStorePassword = "storage_password".toCharArray();
-            char[] keyPassword = "storage_password".toCharArray();
+    char[] keyPassword = "storage_password".toCharArray();
 
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream("/app/keystore.jks"), keyStorePassword);
 
             System.out.println("keystore size:" + ks.size());
 
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, keyPassword);
+    KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+    kmf.init(ks, keyPassword);
 
             
             // SSLContext
