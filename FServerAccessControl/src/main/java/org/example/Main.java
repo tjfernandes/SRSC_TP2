@@ -1,5 +1,8 @@
 package org.example;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
@@ -29,6 +32,21 @@ public class Main {
     public static final String TLS_VERSION          = "TLSv1.2";
     public static final int PORT_2_DISPATCHER       = 8082;
     public static void main(String[] args) {
+        System.out.println("Hello world!");
+
+
+
+        Properties props = new Properties();
+        try (FileInputStream input = new FileInputStream("config.properties")) {
+            props.load(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        String algorithm = props.getProperty("algorithm");
+        String mode = props.getProperty("mode");
+        String padding = props.getProperty("padding");
+        String iv = props.getProperty("iv");
        initTLSSocket();
     }
 
