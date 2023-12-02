@@ -2,40 +2,85 @@ package org.example;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.security.KeyStore;
+import java.security.SecureRandom;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
 
 public class Main {
+
+    private static final String[] confciphersuites = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
+    private static final String[] confprotocols = {"TLSv1.2"};
+
     public static void main(String[] args) {
+        final SSLServerSocket serverSocket = server();
+        while (true) {
+            try(SSLSocket requestSocket = (SSLSocket) serverSocket.accept()) {
+                System.out.println("Client connected");
+                handleRequest(requestSocket, serverSocket);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private static SSLServerSocket server() {
         try {
-            // Load your keystore and truststore here
-            System.setProperty("javax.net.ssl.keyStore", "src/main/java/server-keystore.jks");
-            System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
-            System.setProperty("javax.net.ssl.trustStore", "src/main/java/server.crt");
-            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+            char[] keyStorePassword = "authentication_password".toCharArray();
+            char[] keyPassword = "authentication_password".toCharArray();
 
-            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8080);
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream("/app/keystore.jks"), keyStorePassword);
 
-            // Communication logic with the server
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            System.out.println("keystore size:" + ks.size());
 
-            // Example message to send
-            String message = "Hello, Server!";
-            writer.write(message);
-            writer.newLine();
-            writer.flush();
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, keyPassword);
+            
+            // SSLContext
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
+            sslContext.init(kmf.getKeyManagers(), null, new SecureRandom());
+            SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8083);
+            serverSocket.setEnabledProtocols(confprotocols);
+	        serverSocket.setEnabledCipherSuites(confciphersuites);   
+            
+            return serverSocket;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
-            // Read the server's response
-            String response = reader.readLine();
-            System.out.println("Server response: " + response);
+    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket) {
+        try {
+            // Communication logic with the request
+            BufferedReader reader = new BufferedReader(new InputStreamReader(requestSocket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(requestSocket.getOutputStream()));
 
-            socket.close();
+            String message;
+            while ((message = reader.readLine()) != null) {
+                System.out.println("Received message: " + message);
+
+                // Example response
+                writer.write("Server received your message: " + message);
+                writer.newLine();
+                writer.flush();
+            }
+
+            writer.close();
+            reader.close();
+            requestSocket.close();
+            serverSocket.close();
+
         } catch (IOException e) {
             e.printStackTrace();
         }

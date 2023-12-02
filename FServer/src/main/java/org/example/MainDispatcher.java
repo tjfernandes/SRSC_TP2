@@ -9,7 +9,6 @@ import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.util.Enumeration;
 import java.util.Map;
-import java.security.cert.Certificate;
 
 public class MainDispatcher {
 /* 
@@ -38,14 +37,13 @@ public class MainDispatcher {
                 System.out.println("Alias: " + alias);
                 System.out.println("Certificate: " + certificate.toString());
             }
-
             
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
             // Set up the SSLContext
-        SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
 
             System.out.println("Server is listening on port 8083...");
 
@@ -77,7 +75,7 @@ public class MainDispatcher {
             String response = reader.readLine();
             System.out.println("Server response: " + response);
 
-socket.close();
+        socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
