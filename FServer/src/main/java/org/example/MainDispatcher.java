@@ -1,85 +1,67 @@
 package org.example;
 
+import com.kenai.jffi.Main;
 import com.sun.net.httpserver.*;
 
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.util.Enumeration;
 import java.util.Map;
 
 public class MainDispatcher {
-/* 
-    private static final String SIG_SCHEME_STR =
-            "rsa_pkcs1_sha256,rsa_pss_rsae_sha256,rsa_pss_pss_sha256," +
-                    "ed448,ed25519,ecdsa_secp256r1_sha256";
-*/
+
+    public enum ModuleName {
+        STORAGE,
+        AUTHENTICATION,
+        ACCESS_CONTROL
+    }
+
+    private static String[] getHostAndPort(ModuleName moduleName) {
+        switch (moduleName) {
+            case STORAGE:
+                return new String[]{"localhost", "8084"};
+            case AUTHENTICATION:
+                return new String[]{"localhost", "8086"};
+            case ACCESS_CONTROL:
+                return new String[]{"localhost", "8085"};
+            default:
+                throw new IllegalArgumentException("Invalid module name");
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         int port = 8080;
 
         System.out.println("Server started on port " + port);
+        //SSLSocket socket = initTLSSocket("172.17.0.1", 8083);
+        SSLSocket socket = initTLSSocket(ModuleName.STORAGE);
 
-        try {
-            // Load your keystore and truststore here
+         // Communication logic with the server
+        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
-            System.out.println("truststore loading...");
+        // Example message to send
+        String message = "Hello, Server!";
+        writer.write(message);
+        writer.newLine();
+        writer.flush();
 
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(new FileInputStream("/app/truststore.jks"), "fserver_password".toCharArray());
-
-            Enumeration<String> aliases = trustStore.aliases();
-
-            while (aliases.hasMoreElements()) {
-                String alias = aliases.nextElement();
-                Certificate certificate = trustStore.getCertificate(alias);
-                System.out.println("Alias: " + alias);
-                System.out.println("Certificate: " + certificate.toString());
-            }
-            
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustManagerFactory.init(trustStore);
-
-            // Set up the SSLContext
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
-
-            System.out.println("Server is listening on port 8083...");
-
-            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
-            
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("172.17.0.1", 8083);
-
-        // Start the handshake
-        socket.startHandshake();
-
-            SSLSession session = socket.getSession();
-
-            System.out.println();
-            System.out.println("Hum from my offer server decided to select\n");
-            System.out.println("TLS protocol version: " + session.getProtocol());
-            System.out.println("Ciphersuite: " + session.getCipherSuite());
-
-            // Communication logic with the server
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-
-            // Example message to send
-            String message = "Hello, Server!";
-            writer.write(message);
-            writer.newLine();
-            writer.flush();
-
-            // Read the server's response
-            String response = reader.readLine();
-            System.out.println("Server response: " + response);
+        // Read the server's response
+        String response = reader.readLine();
+        System.out.println("Server response: " + response);
 
         socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
+
 
     private static HttpsServer createHttpsServer(int port) throws Exception {
         // Load keystore
@@ -126,35 +108,71 @@ public class MainDispatcher {
         }
     }
 
-    private static void requestToServer(String serverName, int port) {
+    private static SSLSocket initTLSSocket(ModuleName module) {
+        SSLSocket socket = null;
         try {
+            String[] hostAndPort = getHostAndPort(module);
+
+            char[] keyStorePassword = "dispatcher_password".toCharArray();
+            char[] keyPassword = "dispatcher_password".toCharArray();
+            KeyStore ks = KeyStore.getInstance("JKS");
+            InputStream keystoreStream = Main.class.getResourceAsStream("/keystore.jks");
+            ks.load(keystoreStream, keyStorePassword);
+            System.out.println("keystore size:" + ks.size());
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, keyPassword);
+
             // Load your keystore and truststore here
-            System.setProperty("javax.net.ssl.keyStore", "client-keystore.jks");
-            System.setProperty("javax.net.ssl.keyStorePassword", "your_keystore_password");
-            System.setProperty("javax.net.ssl.trustStore", "trustedstore");
-            System.setProperty("javax.net.ssl.trustStorePassword", "your_truststore_password");
+            System.out.println("truststore loading...");
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            InputStream trustStoreStream = Main.class.getResourceAsStream("/truststore.jks");
+            trustStore.load(trustStoreStream, "dispatcher_truststore_password".toCharArray());
+            Enumeration<String> aliases = trustStore.aliases();
 
-            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                Certificate certificate = trustStore.getCertificate(alias);
+                System.out.println("Alias: " + alias);
+                System.out.println("Certificate: " + certificate.toString());
+            }
             
-            // Communication logic with the server
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
 
-            // Example message to send
-            String message = "Hello, Server!";
-            writer.write(message);
-            writer.newLine();
-            writer.flush();
+            // Set up the SSLContext
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
 
-            // Read the server's response
-            String response = reader.readLine();
-            System.out.println("Server response: " + response);
+            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+            
+            socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
 
-            socket.close();
+            // Start the handshake
+            socket.startHandshake();
+
+            SSLSession session = socket.getSession();
+
+            System.out.println();
+            System.out.println("Hum from my offer server decided to select\n");
+            System.out.println("TLS protocol version: " + session.getProtocol());
+            System.out.println("Ciphersuite: " + session.getCipherSuite());
+
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (KeyManagementException e) { 
+            e.printStackTrace();
+        } catch (UnrecoverableKeyException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
+        return socket;
     }
 
     static class ListHandler implements HttpHandler {
