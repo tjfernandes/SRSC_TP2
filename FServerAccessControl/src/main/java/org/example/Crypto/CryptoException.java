@@ -1,7 +1,6 @@
 package org.example.Crypto;
 
 
-
 public class CryptoException extends Exception 
 {
      public CryptoException() 
