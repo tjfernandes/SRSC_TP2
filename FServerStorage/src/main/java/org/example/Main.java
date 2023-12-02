@@ -38,7 +38,7 @@ public class Main {
     public void cpCommand() {
 
     }
-
+/*
     public void test() {
         String cryptoConfigFilePath = "src/main/java/crypto-config.properties";
         String inputFilePath = "src/main/java/ola.txt";
@@ -98,24 +98,30 @@ public class Main {
     private static final String SIG_SCHEME_STR =
             "rsa_pkcs1_sha256,rsa_pss_rsae_sha256,rsa_pss_pss_sha256," +
                     "ed448,ed25519,ecdsa_secp256r1_sha256";
-
+ */
     public static void main(String[] args) {
-        System.setProperty("jdk.tls.client.SignatureSchemes", SIG_SCHEME_STR);
+System.out.println("CONASSA");        /*System.setProperty("jdk.tls.client.SignatureSchemes", SIG_SCHEME_STR);
         System.setProperty("jdk.tls.server.SignatureSchemes", SIG_SCHEME_STR);
+*/
+        String[] confciphersuites={"TLS_RSA_WITH_AES_256_CBC_SHA256"};
+        String[] confprotocols={"TLSv1.2"};
 
         try {
             // Load your keystore and truststore here;
-            char[] keyStorePassword = "your_storage_keystore_password".toCharArray();
-            char[] keyPassword = "your_storage_key_password".toCharArray();
+            char[] keyStorePassword = "storage_password".toCharArray();
+            char[] keyPassword = "storage_password".toCharArray();
 
             KeyStore ks = KeyStore.getInstance("JKS");
-            try (InputStream is = Main.class.getResourceAsStream("/storage-keystore")) {
-                System.out.println("ENCONTROU keystore");
+
+            try (InputStream is = Main.class.getResourceAsStream("/keystore.jks")) {
+                System.out.println("apanhou");
                 ks.load(is, keyStorePassword);
             }
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, keyStorePassword);
 
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, keyPassword);
+
+            /* 
             KeyStore trustStore = KeyStore.getInstance("JKS");
             try (InputStream is = Main.class.getResourceAsStream("/trustedstore")) {
                 System.out.println("ENCONTROU TRUSTSTORE");
@@ -124,15 +130,18 @@ public class Main {
 
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             tmf.init(trustStore);
-
+*/
             // SSLContext
             SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
-
+            sc.init(kmf.getKeyManagers(), null, null);
+System.out.println("Server is listening on port 8084...");
             SSLServerSocketFactory sslServerSocketFactory = sc.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8084);
+System.out.println("Server is listening on port 8084...");
+            serverSocket.setEnabledProtocols(confprotocols);
+	        serverSocket.setEnabledCipherSuites(confciphersuites);
 
-            System.out.println("Server is listening on port 8083...");
+            System.out.println("Server is listening on port 8084...");
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
