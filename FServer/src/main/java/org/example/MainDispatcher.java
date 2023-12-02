@@ -6,7 +6,9 @@ import javax.net.ssl.*;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
+import java.util.Enumeration;
 import java.util.Map;
+import java.security.cert.Certificate;
 
 public class MainDispatcher {
 /* 
@@ -42,45 +44,44 @@ public class MainDispatcher {
 
             KeyStore trustStore = KeyStore.getInstance("JKS");
             try (InputStream is = MainDispatcher.class.getResourceAsStream("/truststore.jks")) {
-                System.out.println("ENCONTROU TRUSTSTORE");
                 trustStore.load(is, "fserver_password".toCharArray());
+                Enumeration<String> aliases = trustStore.aliases();
+
+                while (aliases.hasMoreElements()) {
+                    String alias = aliases.nextElement();
+                    Certificate certificate = trustStore.getCertificate(alias);
+                    System.out.println("Alias: " + alias);
+                    System.out.println("Certificate: " + certificate.toString());
+                }
             }
 
+            
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
+            // Set up the SSLContext
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
 
+        // Create the SSLSocket
+        SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+        SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
 
-            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
+        // Start the handshake
+        socket.startHandshake();
 
-            socket.startHandshake();
+        // If the handshake succeeded, print a success message
+        System.out.println("Handshake succeeded");
+    // Get the output stream
+OutputStream outputStream = socket.getOutputStream();
 
-            SSLSession session = socket.getSession();
+// Write the message to the output stream
+outputStream.write("Hello World\n".getBytes());
 
-            System.out.println();
-                System.out.println("Hum from my offer server decided to select\n");
-                System.out.println("TLS protocol version: " + session.getProtocol());
-                System.out.println("Ciphersuite: " + session.getCipherSuite());
+// Flush the output stream to ensure the message is sent
+outputStream.flush();
 
-            // Communication logic with the server
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-
-            // Example message to send
-            String message = "Hello, Server!";
-            writer.write(message);
-            writer.newLine();
-            writer.flush();
-
-            // Read the server's response
-            String response = reader.readLine();
-            System.out.println("Server response: " + response);
-
-            socket.close();
+socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
