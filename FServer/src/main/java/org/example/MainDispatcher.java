@@ -51,8 +51,8 @@ public class MainDispatcher {
             
             SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("172.17.0.1", 8083);
 
-        // Start the handshake
-        socket.startHandshake();
+            // Start the handshake
+            socket.startHandshake();
 
             SSLSession session = socket.getSession();
 
