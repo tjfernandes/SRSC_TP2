@@ -1,15 +1,8 @@
 package org.example;
 
-import org.example.Crypto.CryptoException;
-import org.example.Crypto.CryptoStuff;
-import org.example.Crypto.Utils;
-import org.example.Drivers.LocalFileSystemDriver;
-
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.KeyStore;
-import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 
 import javax.net.ssl.*;
 
@@ -100,9 +93,6 @@ public class Main {
                     "ed448,ed25519,ecdsa_secp256r1_sha256";
  */
     public static void main(String[] args) {
-System.out.println("CONASSA");        /*System.setProperty("jdk.tls.client.SignatureSchemes", SIG_SCHEME_STR);
-        System.setProperty("jdk.tls.server.SignatureSchemes", SIG_SCHEME_STR);
-*/
         String[] confciphersuites={"TLS_RSA_WITH_AES_256_CBC_SHA256"};
         String[] confprotocols={"TLSv1.2"};
 
@@ -112,43 +102,26 @@ System.out.println("CONASSA");        /*System.setProperty("jdk.tls.client.Signa
             char[] keyPassword = "storage_password".toCharArray();
 
             KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream("/app/keystore.jks"), keyStorePassword);
 
-            try (InputStream is = Main.class.getResourceAsStream("/keystore.jks")) {
-                System.out.println("apanhou");
-                ks.load(is, keyStorePassword);
-            }
+            System.out.println("keystore size:" + ks.size());
 
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, keyPassword);
 
-            /* 
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            try (InputStream is = Main.class.getResourceAsStream("/trustedstore")) {
-                System.out.println("ENCONTROU TRUSTSTORE");
-                trustStore.load(is, "your_client_truststore_password".toCharArray());
-            }
-
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(trustStore);
-*/
+            
             // SSLContext
-            SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(kmf.getKeyManagers(), null, null);
-System.out.println("Server is listening on port 8084...");
-            SSLServerSocketFactory sslServerSocketFactory = sc.getServerSocketFactory();
-            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8084);
-System.out.println("Server is listening on port 8084...");
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
+            sslContext.init(kmf.getKeyManagers(), null, new SecureRandom());
+            SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8083);
             serverSocket.setEnabledProtocols(confprotocols);
 	        serverSocket.setEnabledCipherSuites(confciphersuites);
 
-            System.out.println("Server is listening on port 8084...");
-
-            while (true) {
-                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-
-                // Handle client communication in a separate thread
-                new Thread(() -> handleClient(clientSocket, serverSocket)).start();
-            }
+            System.out.println("Server is listening on port 8083...");
+            SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+            handleClient(clientSocket, serverSocket);
+            
         } catch (Exception e) {
             e.printStackTrace();
         }

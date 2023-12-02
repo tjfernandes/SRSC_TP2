@@ -6,6 +6,8 @@ import javax.net.ssl.*;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.util.Enumeration;
 import java.util.Map;
 
 public class MainDispatcher {
@@ -15,35 +17,25 @@ public class MainDispatcher {
                     "ed448,ed25519,ecdsa_secp256r1_sha256";
 */
     public static void main(String[] args) throws Exception {
-  /*      System.setProperty("jdk.tls.client.SignatureSchemes", SIG_SCHEME_STR);
-        System.setProperty("jdk.tls.server.SignatureSchemes", SIG_SCHEME_STR);
- */
         int port = 8080;
-
-        HttpsServer server = createHttpsServer(port);
-
-        //define endpoints
-        server.createContext("/api/login", new LoginHandler());
-        server.createContext("/api/ls", new ListHandler());
-        server.createContext("/api/mkdir", new MakeDirHandler());
-        server.createContext("/api/put", new PutHandler());
-        server.createContext("/api/get", new GetHandler());
-        server.createContext("/api/cp", new CopyHandler());
-        server.createContext("/api/rm", new RemoveHandler());
-        server.createContext("/api/file", new FileHandler());
-
-        server.setExecutor(null);
-        server.start();
 
         System.out.println("Server started on port " + port);
 
         try {
             // Load your keystore and truststore here
 
+            System.out.println("truststore loading...");
+
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            try (InputStream is = MainDispatcher.class.getResourceAsStream("/truststore.jks")) {
-                System.out.println("ENCONTROU TRUSTSTORE");
-                trustStore.load(is, "fserver_password".toCharArray());
+            trustStore.load(new FileInputStream("/app/truststore.jks"), "fserver_password".toCharArray());
+
+            Enumeration<String> aliases = trustStore.aliases();
+
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                Certificate certificate = trustStore.getCertificate(alias);
+                System.out.println("Alias: " + alias);
+                System.out.println("Certificate: " + certificate.toString());
             }
 
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -52,19 +44,20 @@ public class MainDispatcher {
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
 
+            System.out.println("Server is listening on port 8083...");
 
-            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
             
-            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
+            SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("172.17.0.1", 8083);
 
             socket.startHandshake();
 
             SSLSession session = socket.getSession();
 
             System.out.println();
-                System.out.println("Hum from my offer server decided to select\n");
-                System.out.println("TLS protocol version: " + session.getProtocol());
-                System.out.println("Ciphersuite: " + session.getCipherSuite());
+            System.out.println("Hum from my offer server decided to select\n");
+            System.out.println("TLS protocol version: " + session.getProtocol());
+            System.out.println("Ciphersuite: " + session.getCipherSuite());
 
             // Communication logic with the server
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -88,8 +81,8 @@ public class MainDispatcher {
 
     private static HttpsServer createHttpsServer(int port) throws Exception {
         // Load keystore
-        char[] keyStorePassword = "tftftf".toCharArray();
-        char[] keyPassword = "tftftfpass".toCharArray();
+        char[] keyStorePassword = "".toCharArray();
+        char[] keyPassword = "".toCharArray();
 
         InputStream keyStoreIS = MainDispatcher.class.getClassLoader().getResourceAsStream("tfselfcertificate.jks");
         KeyStore keyStore = KeyStore.getInstance("PKCS12");
@@ -141,7 +134,7 @@ public class MainDispatcher {
 
             SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
             SSLSocket socket = (SSLSocket) sslSocketFactory.createSocket("localhost", 8084);
-
+            
             // Communication logic with the server
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
