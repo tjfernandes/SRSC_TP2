@@ -13,11 +13,11 @@ public class Main {
     public static final String[] CONFPROTOCOLS      = {"TLSv1.2"};;
     public static final String[] CONFCIPHERSUITES   = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
     public static final String KEYSTORE_PASSWORD    = "storage_password";
-    public static final String KEYSTORE_PATH        = "/keystore.jks";
+    public static final String KEYSTORE_PATH        = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD  = "storage_truststore_password";
-    public static final String TRUSTSTORE_PATH      = "/truststore.jks";
+    public static final String TRUSTSTORE_PATH      = "/app/truststore.jks";
     public static final String TLS_VERSION          = "TLSv1.2";
-    public static final int PORT_2_DISPATCHER       = 8084;
+    public static final int PORT_2_DISPATCHER       = 8083;
 
     public void lsCommand() {
 
@@ -108,17 +108,14 @@ public class Main {
         try {
             //Keystore
             KeyStore ks = KeyStore.getInstance("JKS");
-            InputStream keystoreStream = Main.class.getResourceAsStream(KEYSTORE_PATH);
-            ks.load(keystoreStream, KEYSTORE_PASSWORD
-            .toCharArray());
+            ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
 
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
             //TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            InputStream trustStoreStream = Main.class.getResourceAsStream(TRUSTSTORE_PATH);
-            trustStore.load(trustStoreStream, TRUSTSTORE_PASSWORD.toCharArray());
+            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
             Enumeration<String> aliases = trustStore.aliases();
 
             //Print all certificates in truststore

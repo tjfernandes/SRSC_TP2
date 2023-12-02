@@ -49,7 +49,7 @@ public class Main {
             SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
             sslContext.init(kmf.getKeyManagers(), null, new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
-            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8083);
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(8081);
             serverSocket.setEnabledProtocols(confprotocols);
 	        serverSocket.setEnabledCipherSuites(confciphersuites);   
             

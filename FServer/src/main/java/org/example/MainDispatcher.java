@@ -2,10 +2,8 @@ package org.example;
 
 import com.kenai.jffi.Main;
 import com.sun.net.httpserver.*;
-
 import javax.net.ssl.*;
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -28,11 +26,11 @@ public class MainDispatcher {
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
             case STORAGE:
-                return new String[]{"localhost", "8084"};
+                return new String[]{"172.17.0.1", "8083"};
             case AUTHENTICATION:
-                return new String[]{"localhost", "8086"};
+                return new String[]{"172.17.0.1", "8081"};
             case ACCESS_CONTROL:
-                return new String[]{"localhost", "8085"};
+                return new String[]{"172.17.0.1", "8082"};
             default:
                 throw new IllegalArgumentException("Invalid module name");
         }
@@ -42,7 +40,6 @@ public class MainDispatcher {
         int port = 8080;
 
         System.out.println("Server started on port " + port);
-        //SSLSocket socket = initTLSSocket("172.17.0.1", 8083);
         SSLSocket socket = initTLSSocket(ModuleName.STORAGE);
 
          // Communication logic with the server
@@ -60,33 +57,6 @@ public class MainDispatcher {
         System.out.println("Server response: " + response);
 
         socket.close();
-    }
-
-
-    private static HttpsServer createHttpsServer(int port) throws Exception {
-        // Load keystore
-        char[] keyStorePassword = "".toCharArray();
-        char[] keyPassword = "".toCharArray();
-
-        InputStream keyStoreIS = MainDispatcher.class.getClassLoader().getResourceAsStream("tfselfcertificate.jks");
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
-        keyStore.load(keyStoreIS, keyStorePassword);
-
-        final KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
-        keyManagerFactory.init(keyStore, keyStorePassword);
-
-        final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
-        trustManagerFactory.init(keyStore);
-
-        final SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
-
-
-        HttpsServer server = HttpsServer.create(new InetSocketAddress(port), 0);
-        server.setHttpsConfigurator(new HttpsConfigurator(sslContext));
-
-        return server;
-
     }
 
     static class LoginHandler implements HttpHandler {
@@ -116,18 +86,16 @@ public class MainDispatcher {
             char[] keyStorePassword = "dispatcher_password".toCharArray();
             char[] keyPassword = "dispatcher_password".toCharArray();
             KeyStore ks = KeyStore.getInstance("JKS");
-            InputStream keystoreStream = Main.class.getResourceAsStream("/keystore.jks");
-            ks.load(keystoreStream, keyStorePassword);
-            System.out.println("keystore size:" + ks.size());
-
+            ks.load(new FileInputStream("/app/keystore.jks"), keyStorePassword);
+            System.out.println("keystore loading...");
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, keyPassword);
+            System.out.println("keystore loaded");
 
             // Load your keystore and truststore here
             System.out.println("truststore loading...");
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            InputStream trustStoreStream = Main.class.getResourceAsStream("/truststore.jks");
-            trustStore.load(trustStoreStream, "dispatcher_truststore_password".toCharArray());
+            trustStore.load(new FileInputStream("/app/truststore.jks"), "dispatcher_truststore_password".toCharArray());
             Enumeration<String> aliases = trustStore.aliases();
 
             while (aliases.hasMoreElements()) {
@@ -169,7 +137,6 @@ public class MainDispatcher {
         } catch (KeyManagementException e) { 
             e.printStackTrace();
         } catch (UnrecoverableKeyException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         return socket;
