@@ -19,14 +19,12 @@ public class Main {
     public static final int PORT_2_DISPATCHER       = 8080;
     public static final int MY_PORT                 = 8083;
 
-    
-/*
-    public static void test() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
-
-        String inputFilePath = "src/main/java/ola.txt";
-        String uploadTargetPath = "bombs.txt";
+    /* 
+    public static void test() {
+        String inputFilePath = "/app/ola.txt";
         
         byte[] fileContent;
+    
         try {
             fileContent = Files.readAllBytes(Paths.get(inputFilePath));
         } catch (IOException e) {
@@ -35,16 +33,15 @@ public class Main {
         }
 
         FsManager fsManager = new FsManager();
+        fsManager.putCommand("ola.txt", fileContent);
+        byte[] a = fsManager.getCommand("ola.txt");
 
-        var a = fsManager.lsCommand("");
-    
-        for (String file : a) {
-            System.out.println(file);
-        }
+        System.out.println("File content: " + new String(a));    
     }
   */
     public static void main(String[] args) {
        initTLSSocket();
+       //test();
     }
 
     private static void initTLSSocket(){
@@ -82,7 +79,7 @@ public class Main {
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
 	        serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
-            System.out.println("Server is listening on port 8083...");
+            System.out.println("Server is listening...");
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();

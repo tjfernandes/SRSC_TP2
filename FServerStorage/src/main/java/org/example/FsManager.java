@@ -1,5 +1,8 @@
 package org.example;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
@@ -7,10 +10,10 @@ import java.util.List;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 
-import org.example.Crypto.CryptoException;
-import org.example.Crypto.CryptoStuff;
-import org.example.Drivers.DropboxDriver;
-import org.example.Drivers.LocalFileSystemDriver;
+import org.example.crypto.CryptoException;
+import org.example.crypto.CryptoStuff;
+import org.example.drivers.DropboxDriver;
+import org.example.drivers.LocalFileSystemDriver;
 
 public class FsManager {
 
@@ -23,21 +26,23 @@ public class FsManager {
     private DropboxDriver dbx;
     private SecretKey key;
 
-    private static final String FILESYSTEM_CONFIG_PATH = "src/main/java/filesystem-config.properties";
-    private static final String DROPBOXCONFIG_PATH = "src/main/java/dropbox-config.properties";
+    private static final String FILESYSTEM_CONFIG_PATH = "/app/filesystem-config.properties";
+    private static final String DROPBOXCONFIG_PATH = "/app/java/dropbox-config.properties";
 
     public FsManager() {
-        crypto = CryptoStuff.getInstance();
-        fs = new LocalFileSystemDriver(FILESYSTEM_CONFIG_PATH);
-        dbx = new DropboxDriver(DROPBOXCONFIG_PATH);
-        try {
-            KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
-            kg.init(KEYSIZE);
-            this.key = kg.generateKey();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
+    crypto = CryptoStuff.getInstance();
+    fs = new LocalFileSystemDriver(FILESYSTEM_CONFIG_PATH);
+    //dbx = new DropboxDriver(DROPBOXCONFIG_PATH);
+    try {
+        Files.createDirectories(Paths.get("/filesystem"));
+
+        KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
+        kg.init(KEYSIZE);
+        this.key = kg.generateKey();
+    } catch (NoSuchAlgorithmException | IOException e) {
+        e.printStackTrace();
     }
+}
 
     public List<String> lsCommand(String path) {
         return fs.listFolder(path);
