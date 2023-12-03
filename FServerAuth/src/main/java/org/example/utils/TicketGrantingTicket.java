@@ -5,6 +5,8 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+import javax.crypto.SecretKey;
+
 public class TicketGrantingTicket implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
@@ -12,11 +14,11 @@ public class TicketGrantingTicket implements Serializable {
     private final String clientId;
     private final String clientAddress;
     private final String tgsServerIdentifier;
-    private final String keyClientTGS;
+    private final SecretKey keyClientTGS;
     private final LocalDateTime issueTime;
     private final Duration lifetime;
 
-    public TicketGrantingTicket(String clientId, String clientAddress, String tgsServerIdentifier, String keyClientTGS) {
+    public TicketGrantingTicket(String clientId, String clientAddress, String tgsServerIdentifier, SecretKey keyClientTGS) {
         this.clientId = clientId;
         this.clientAddress = clientAddress;
         this.tgsServerIdentifier = tgsServerIdentifier;
@@ -33,7 +35,7 @@ public class TicketGrantingTicket implements Serializable {
         return tgsServerIdentifier;
     }
 
-    public String getKey() {
+    public SecretKey getKey() {
         return keyClientTGS;
     }
 

@@ -7,6 +7,7 @@ import okhttp3.Request;
 import javax.net.ssl.*;
 
 import org.example.utils.RequestMessage;
+import org.example.utils.ResponseMessage;
 
 import java.io.*;
 import java.security.KeyManagementException;
@@ -75,7 +76,7 @@ public class MainDispatcher {
             }
         }  
         
-        RequestMessage requestMessage = new RequestMessage("client1", "service1", 1234);
+        RequestMessage requestMessage = new RequestMessage("client1","127.0.0.1", "service1", 1234);
 
         SSLSocket socket = initTLSSocket(ModuleName.AUTHENTICATION);
 
@@ -87,12 +88,11 @@ public class MainDispatcher {
         objectOutputStream.flush();
 
         // Get the input stream
-BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
 
         // Read the server's response
-        String response = reader.readLine();
+        ResponseMessage response = (ResponseMessage) objectInputStream.readObject();
         System.out.println("Server response: " + response);
-
 
         socket.close();
     }

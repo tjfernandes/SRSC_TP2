@@ -5,13 +5,15 @@ import java.io.Serializable;
 import java.security.InvalidAlgorithmParameterException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 import javax.crypto.SecretKey;
 
-import org.example.crypto.CryptoException;
-import org.example.crypto.CryptoStuff;
+import org.example.Crypto.CryptoException;
+import org.example.Crypto.CryptoStuff;
 
 public class ResponseMessage implements Serializable {
+    
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -48,5 +50,15 @@ public class ResponseMessage implements Serializable {
 
     public byte[] getEncryptedTGT() {
         return encryptedTGT;
+    }
+
+    @Override
+    public String toString() {
+    return "ResponseMessage{" +
+        "generatedKey=" + generatedKey +
+        ", issueTime=" + issueTime +
+        ", lifetime=" + lifetime +
+        ", encryptedTGT=" + Arrays.toString(encryptedTGT) +
+        '}';
     }
 }

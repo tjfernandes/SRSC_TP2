@@ -2,6 +2,7 @@ package org.example;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -10,7 +11,9 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Properties;
 
@@ -23,6 +26,7 @@ import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
 
+import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
@@ -65,25 +69,37 @@ public class Main {
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
 
             RequestMessage requestMessage;
-            while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
-                Properties properties = loadProperties("/app/crypto-config.properties");
-                String tgskey = properties.getProperty("TGS_AS_KEY");
-
-                CryptoStuff cryptoStuff = CryptoStuff.getInstance();        
+            while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {  
 
                 KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
                 kg.init(KEYSIZE);
 
                 SecretKey generatedkey = kg.generateKey();
                 
-                SecureRandom secureRandom = new SecureRandom();
-                int nonce = secureRandom.nextInt();
 
-                TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,"ACCESS_CONTROL", nonce);
+                TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,"ACCESS_CONTROL", generatedkey);
                 
-                ResponseMessage response = new ResponseMessage(cryptoStuff.encrypt(tgskey, tgt), generatedkey);
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                ObjectOutputStream out = null;
+                ResponseMessage response = null;
+                try {
+                    out = new ObjectOutputStream(bos);   
+                    out.writeObject(tgt);
+                    out.flush();
+                    byte[] tgtBytes = bos.toByteArray();
+
+                    response = new ResponseMessage(generatedkey,tgtBytes);
+                } catch (IOException e ) {
+                    e.printStackTrace();
+                } finally {
+                    try {
+                        bos.close();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
                 
-                objectOutputStream.writeUTF(response);
+                objectOutputStream.writeObject(response);
                 objectOutputStream.flush();
             }
 
@@ -93,6 +109,9 @@ public class Main {
 
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
+        } catch (NoSuchAlgorithmException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
         }
     }
 
