@@ -152,6 +152,7 @@ public class Main {
             }
         } catch (IOException | NoSuchAlgorithmException | ClassNotFoundException e) {
             e.printStackTrace();
+        }
 
     }
 

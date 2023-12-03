@@ -43,5 +43,8 @@ keytool -import -file access_control.cer -keystore truststore.jks -storepass dis
 
 ******Cliente******
 
+--keystore--
+keytool -genkey -alias client -keyalg RSA -keystore keystore.jks -keysize 2048 -storepass client_password
+
 --truststore--
 keytool -import -file dispatcher.cer -keystore truststore.jks -storepass client_truststore_password -alias dispatcher

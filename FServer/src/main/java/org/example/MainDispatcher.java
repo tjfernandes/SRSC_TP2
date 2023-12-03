@@ -1,6 +1,9 @@
 package org.example;
 
 import com.sun.net.httpserver.*;
+import org.example.utils.RequestMessage;
+import org.example.utils.ResponseMessage;
+
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.URLEncoder;
@@ -47,27 +50,27 @@ public class MainDispatcher {
     }
 
     public static void main(String[] args) throws Exception {
-        //initTLSServerSocket();
+        initTLSServerSocket();
 
 
-        boolean runStorage = true;
-        boolean runAuthentication = true;
-        while(runStorage) {
-            try {
-                sendMessage(ModuleName.STORAGE);
-                runStorage = false;
-            } catch (Exception e) {
-                System.out.println("Failed to connect to storage server");
-            }
-        }
-        while(runAuthentication) {
-            try {
-                sendMessage(ModuleName.AUTHENTICATION);
-                runAuthentication = false;
-            } catch (Exception e) {
-                System.out.println("Failed to connect to auth server");
-            }
-        }
+//        boolean runStorage = true;
+//        boolean runAuthentication = true;
+//        while(runStorage) {
+//            try {
+//                sendMessage(ModuleName.STORAGE);
+//                runStorage = false;
+//            } catch (Exception e) {
+//                System.out.println("Failed to connect to storage server");
+//            }
+//        }
+//        while(runAuthentication) {
+//            try {
+//                sendMessage(ModuleName.AUTHENTICATION);
+//                runAuthentication = false;
+//            } catch (Exception e) {
+//                System.out.println("Failed to connect to auth server");
+//            }
+//        }
     }
 
     private static void initTLSServerSocket() {
@@ -79,14 +82,11 @@ public class MainDispatcher {
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
-
             // SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), null, new SecureRandom());
-
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
             serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
@@ -111,9 +111,8 @@ public class MainDispatcher {
             BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 
-            String command = reader.readLine();
-
-            if (command != null) {
+            String command;
+            while((command = reader.readLine()) != null) {
                 System.out.println("Received command: " + command);
 
                 writer.write(command);
@@ -155,7 +154,7 @@ public class MainDispatcher {
 //                        file = fullCommand[1];
 //                    default: break;
 //                }
-            } else System.out.println("CONA");
+            }
 
             writer.close();
             reader.close();
@@ -225,7 +224,7 @@ public class MainDispatcher {
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
 
             socket.setEnabledProtocols(CONFPROTOCOLS);
-            //socket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            socket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
             // Start the handshake
             socket.startHandshake();

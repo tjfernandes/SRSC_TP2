@@ -1,5 +1,6 @@
 package org.example;
 
+
 import java.awt.event.*;
 import javax.net.ssl.*;
 import javax.swing.*;
@@ -23,7 +24,7 @@ public class RemoteFileSystemApp {
     public static final char[] TRUSTSTORE_PASSWORD = "client_truststore_password".toCharArray();
     public static final String TRUSTSTORE_PATH     = "/truststore.jks";
     public static final String TLS_VERSION         = "TLSv1.2";
-    public static final String DISPATCHER_HOST     = "172.28.0.5";
+    public static final String DISPATCHER_HOST     = "localhost";
     public static final int DISPATCHER_PORT        = 8080;
 
     public static void main(String[] args) throws IOException {
@@ -58,6 +59,12 @@ public class RemoteFileSystemApp {
         SSLSocket socket = null;
         try {
 
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            keyStore.load(RemoteFileSystemApp.class.getResourceAsStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(keyStore, KEYSTORE_PASSWORD.toCharArray());
+
             KeyStore trustStore = KeyStore.getInstance(TRUSTSTORE_TYPE);
             trustStore.load(RemoteFileSystemApp.class.getResourceAsStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD);
             Enumeration<String> aliases = trustStore.aliases();
@@ -74,14 +81,14 @@ public class RemoteFileSystemApp {
 
             // Set up the SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
-            sslContext.init(null, trustManagerFactory.getTrustManagers(), new SecureRandom());
+            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
             System.out.println("HOST: " + DISPATCHER_HOST);
             System.out.println("PORT: " + DISPATCHER_PORT);
 
-            socket = (SSLSocket) sslSocketFactory.createSocket("172.17.0.1", 8080);
+            socket = (SSLSocket) sslSocketFactory.createSocket(DISPATCHER_HOST, 8080);
 
 
             socket.setEnabledProtocols(CONFPROTOCOLS);
