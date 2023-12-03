@@ -26,7 +26,8 @@ public class Main {
     public static final String TRUSTSTORE_PASSWORD  = "storage_truststore_password";
     public static final String TRUSTSTORE_PATH      = "/app/truststore.jks";
     public static final String TLS_VERSION          = "TLSv1.2";
-    public static final int PORT_2_DISPATCHER       = 8083;
+    public static final int PORT_2_DISPATCHER       = 8080;
+    public static final int MY_PORT                 = 8083;
 
     public void lsCommand() {
 
@@ -110,7 +111,8 @@ public class Main {
     }
  
     public static void main(String[] args) {
-       //initTLSSocket();
+       initTLSSocket();
+
        try {
         test();
     } catch (NoSuchAlgorithmException e) {
@@ -153,13 +155,14 @@ public class Main {
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
 
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
-            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(PORT_2_DISPATCHER);
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
 	        serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
-            System.out.println("Server is listening on socket...");
+            System.out.println("Server is listening on port 8083...");
             SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                handleRequest(clientSocket, serverSocket);  
+            System.out.println("Client connected");
+            handleRequest(clientSocket, serverSocket);  
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -177,7 +180,7 @@ public class Main {
                 System.out.println("Received message: " + message);
 
                 // Example response
-                writer.write("Server received your message: " + message);
+                writer.write("Server Storage received your message: " + message);
                 writer.newLine();
                 writer.flush();
             }

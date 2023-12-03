@@ -1,5 +1,4 @@
-package org.example;
-
+package org.example.Crypto;
 
 import java.security.Key;
 import java.security.InvalidAlgorithmParameterException;

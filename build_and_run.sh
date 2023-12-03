@@ -24,7 +24,7 @@ remove_container_if_exists() {
 remove_image_if_exists() {
     if image_exists "$1"; then
         docker rmi "$1"
-    else0
+    else
         echo "Image $1 does not exist."
     fi
 }

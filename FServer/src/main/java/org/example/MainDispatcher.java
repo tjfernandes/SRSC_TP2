@@ -1,6 +1,5 @@
 package org.example;
 
-import com.kenai.jffi.Main;
 import com.sun.net.httpserver.*;
 import javax.net.ssl.*;
 import java.io.*;
@@ -23,6 +22,15 @@ public class MainDispatcher {
         ACCESS_CONTROL
     }
 
+    public static final String[] CONFPROTOCOLS      = {"TLSv1.2"};;
+    public static final String[] CONFCIPHERSUITES   = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
+    public static final String KEYSTORE_PASSWORD    = "dispatcher_password";
+    public static final String KEYSTORE_PATH        = "/app/keystore.jks";
+    public static final String TRUSTSTORE_PASSWORD  = "dispatcher_truststore_password";
+    public static final String TRUSTSTORE_PATH      = "/app/truststore.jks";
+    public static final String TLS_VERSION          = "TLSv1.2";
+    public static final int MY_PORT                 = 8080;
+
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
             case STORAGE:
@@ -37,10 +45,13 @@ public class MainDispatcher {
     }
 
     public static void main(String[] args) throws Exception {
-        int port = 8080;
+        sendMessage(ModuleName.STORAGE);
+        sendMessage(ModuleName.AUTHENTICATION);
+    }
 
-        System.out.println("Server started on port " + port);
-        SSLSocket socket = initTLSSocket(ModuleName.STORAGE);
+    private static void sendMessage(ModuleName moduleName) throws IOException {
+        
+        SSLSocket socket = initTLSSocket(moduleName);
 
          // Communication logic with the server
         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -83,19 +94,15 @@ public class MainDispatcher {
         try {
             String[] hostAndPort = getHostAndPort(module);
 
-            char[] keyStorePassword = "dispatcher_password".toCharArray();
-            char[] keyPassword = "dispatcher_password".toCharArray();
+            //KeyStore
             KeyStore ks = KeyStore.getInstance("JKS");
-            ks.load(new FileInputStream("/app/keystore.jks"), keyStorePassword);
-            System.out.println("keystore loading...");
+            ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, keyPassword);
-            System.out.println("keystore loaded");
+            kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
-            // Load your keystore and truststore here
-            System.out.println("truststore loading...");
+            //TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(new FileInputStream("/app/truststore.jks"), "dispatcher_truststore_password".toCharArray());
+            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
             Enumeration<String> aliases = trustStore.aliases();
 
             while (aliases.hasMoreElements()) {
@@ -109,10 +116,13 @@ public class MainDispatcher {
             trustManagerFactory.init(trustStore);
 
             // Set up the SSLContext
-            SSLContext sslContext = SSLContext.getInstance("TLS");
+            SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+
+            System.out.println(hostAndPort[0]);
+            System.out.println(hostAndPort[1]);
             
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
 
