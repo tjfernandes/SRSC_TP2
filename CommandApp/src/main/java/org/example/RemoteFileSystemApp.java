@@ -1,184 +1,113 @@
 package org.example;
 
+
 import java.awt.event.*;
+import javax.net.ssl.*;
 import javax.swing.*;
 import java.awt.*;
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.security.cert.Certificate;
+import java.util.Enumeration;
 
-public class RemoteFileSystemApp extends JFrame {
+public class RemoteFileSystemApp {
 
-    public static void main(String[] args) {
-        JFrame frame = new JFrame("Remote FS");
-        frame.setSize(800, 400);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    public static final String[] CONFPROTOCOLS     = {"TLSv1.2"};;
+    public static final String[] CONFCIPHERSUITES  = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
+    public static final String KEYSTORE_TYPE       = "JKS";
+    public static final String KEYSTORE_PASSWORD   = "client_password";
+    public static final String KEYSTORE_PATH       = "/keystore.jks";
+    public static final String TRUSTSTORE_TYPE     = "JKS";
+    public static final char[] TRUSTSTORE_PASSWORD = "client_truststore_password".toCharArray();
+    public static final String TRUSTSTORE_PATH     = "/truststore.jks";
+    public static final String TLS_VERSION         = "TLSv1.2";
+    public static final String DISPATCHER_HOST     = "localhost";
+    public static final int DISPATCHER_PORT        = 8080;
 
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(BorderFactory.createEmptyBorder(35, 35, 35, 35));
-
-        JLabel inputInstruction = new JLabel("Enter your command");
-        JTextField commandTextField = new JTextField();
-        JTextArea outputText = new JTextArea();
-        outputText.setLineWrap(true);
-        outputText.setWrapStyleWord(true);
-        outputText.setEditable(false);
-        JScrollPane scrollPane = new JScrollPane(outputText);
-        scrollPane.setPreferredSize(new Dimension(750, 300));
-
-        JButton requestButton = getjButton(commandTextField, outputText);
-
-        panel.add(inputInstruction);
-        panel.add(commandTextField);
-        panel.add(requestButton);
-        panel.add(scrollPane);
-
-        frame.add(panel);
-        frame.setVisible(true);
-    }
-
-    private static JButton getjButton(JTextField commandTextField, JTextArea outputText) {
-        JButton requestButton = new JButton("Request");
-        requestButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String command = commandTextField.getText();
-                String response = "";
-                try {
-                    response = requestCommand(command);
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
-                outputText.append(response + "\n");
-                commandTextField.setText("");
-            }
-        });
-        return requestButton;
+    public static void main(String[] args) throws IOException {
+        String response = requestCommand("login username password");
+        System.out.println(response);
     }
 
 
     private static String requestCommand(String command) throws IOException {
 
-        String baseUrl = "https://localhost:8080/api";
+        SSLSocket socket = initTLSSocket();
 
-        String url = "";
+        // Communication logic with the server
+        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
-        String jwtToken = null;
+        writer.write(command);
+        writer.newLine();
+        writer.flush();
 
-        String response = "";
+        // Read the server's response
+        String response = reader.readLine();
 
-        String[] fullCommand = command.split("\\s+");
+        reader.close();
+        writer.close();
+        socket.close();
 
-        String commandName = fullCommand[0];
+        return response;
+    }
 
-        switch (commandName) {
-            case "login":
+    private static SSLSocket initTLSSocket() {
+        SSLSocket socket = null;
+        try {
 
-                String username = fullCommand[1];
-                String password = fullCommand[2];
-                String encodedUsername = URLEncoder.encode(username, StandardCharsets.UTF_8);
-                String encodedPassword = URLEncoder.encode(password, StandardCharsets.UTF_8);
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            keyStore.load(RemoteFileSystemApp.class.getResourceAsStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
 
-                url = baseUrl + "/login?username=" + encodedUsername + "&password=" + encodedPassword;
-                //url = baseUrl + "/login";
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(keyStore, KEYSTORE_PASSWORD.toCharArray());
 
-                response = HttpUtils.makeHttpRequest(url, "POST", null);
+            KeyStore trustStore = KeyStore.getInstance(TRUSTSTORE_TYPE);
+            trustStore.load(RemoteFileSystemApp.class.getResourceAsStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD);
+            Enumeration<String> aliases = trustStore.aliases();
 
-                return "Response: " + response;
+//            while (aliases.hasMoreElements()) {
+//                String alias = aliases.nextElement();
+//                Certificate certificate = trustStore.getCertificate(alias);
+//                System.out.println("Alias: " + alias);
+//                System.out.println("Certificate: " + certificate.toString());
+//            }
 
-            case "ls":
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
 
-                jwtToken = JwtTokenUtils.getStoredToken();
+            // Set up the SSLContext
+            SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
+            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
 
-                String usernameLs = fullCommand[1];
-                String pathLs = fullCommand[2];
-                String encodedUsernameLs = URLEncoder.encode(usernameLs, StandardCharsets.UTF_8);
-                String encodedPathLs = URLEncoder.encode(pathLs, StandardCharsets.UTF_8);
+            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
-                url = baseUrl + "/ls?username=" + encodedUsernameLs + "&path=" + encodedPathLs;
+            System.out.println("HOST: " + DISPATCHER_HOST);
+            System.out.println("PORT: " + DISPATCHER_PORT);
 
-                response = HttpUtils.makeHttpRequest(url, "GET", jwtToken);
-                return "Response: " + response;
+            socket = (SSLSocket) sslSocketFactory.createSocket(DISPATCHER_HOST, 8080);
 
-            case "mkdir":
 
-                jwtToken = JwtTokenUtils.getStoredToken();
+            socket.setEnabledProtocols(CONFPROTOCOLS);
+            socket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
-                String usernameMkDir = fullCommand[1];
-                String pathMkDir = fullCommand[2];
-                String encodedUsernameMkDir = URLEncoder.encode(usernameMkDir, StandardCharsets.UTF_8);
-                String encodedPathMkDir = URLEncoder.encode(pathMkDir, StandardCharsets.UTF_8);
+            socket.startHandshake();
 
-                url = baseUrl + "/mkdir?username=" + encodedUsernameMkDir + "&path=" + encodedPathMkDir;
+            SSLSession session = socket.getSession();
 
-                response = HttpUtils.makeHttpRequest(url, "POST", jwtToken);
-                return "Response: " + response;
+            System.out.println();
+            System.out.println("Hum from my offer server decided to select\n");
+            System.out.println("TLS protocol version: " + session.getProtocol());
+            System.out.println("Ciphersuite: " + session.getCipherSuite());
 
-            case "put":
-                jwtToken = JwtTokenUtils.getStoredToken();
-
-                String usernamePut = fullCommand[1];
-                String filePut = fullCommand[2];
-                String encodedUsernamePut = URLEncoder.encode(usernamePut, StandardCharsets.UTF_8);
-                String encodedFilePut = URLEncoder.encode(filePut, StandardCharsets.UTF_8);
-
-                url = baseUrl + "/mkdir?username=" + encodedUsernamePut + "&file=" + encodedFilePut;
-
-                response = HttpUtils.makeHttpRequest(url, "POST", jwtToken);
-                return "Response: " + response;
-            case "get":
-                jwtToken = JwtTokenUtils.getStoredToken();
-
-                String usernameGet = fullCommand[1];
-                String fileGet = fullCommand[2];
-                String encodedUsernameGet = URLEncoder.encode(usernameGet, StandardCharsets.UTF_8);
-                String encodedFileGet = URLEncoder.encode(fileGet, StandardCharsets.UTF_8);
-
-                url = baseUrl + "/get?username=" + encodedUsernameGet + "&file=" + encodedFileGet;
-
-                response = HttpUtils.makeHttpRequest(url, "GET", jwtToken);
-                return "Response: " + response;
-            case "cp":
-                jwtToken = JwtTokenUtils.getStoredToken();
-
-                String usernameCp = fullCommand[1];
-                String srcFile = fullCommand[2];
-                String destFile = fullCommand[3];
-                String encodedUsernameCp = URLEncoder.encode(usernameCp, StandardCharsets.UTF_8);
-                String encodedSrcFile = URLEncoder.encode(srcFile, StandardCharsets.UTF_8);
-                String encodedDestFile = URLEncoder.encode(destFile, StandardCharsets.UTF_8);
-
-                url = baseUrl + "/cp?username=" + encodedUsernameCp + "&srcFile=" + encodedSrcFile + "&destFile=" + encodedDestFile;
-
-                response = HttpUtils.makeHttpRequest(url, "PUT", jwtToken);
-                return "Response: " + response;
-            case "rm":
-                jwtToken = JwtTokenUtils.getStoredToken();
-
-                String usernameDelete = fullCommand[1];
-                String fileDelete = fullCommand[2];
-                String encodedUsernameDelete = URLEncoder.encode(usernameDelete, StandardCharsets.UTF_8);
-                String encodedFileDelete = URLEncoder.encode(fileDelete, StandardCharsets.UTF_8);
-
-                url = baseUrl + "/get?username=" + encodedUsernameDelete + "&file=" + encodedFileDelete;
-
-                response = HttpUtils.makeHttpRequest(url, "DELETE", jwtToken);
-                return "Response: " + response;
-            case "file":
-                jwtToken = JwtTokenUtils.getStoredToken();
-
-                String file = fullCommand[1];
-                String encodedFile = URLEncoder.encode(file, StandardCharsets.UTF_8);
-
-                url = baseUrl + "/get?file=" + encodedFile;
-
-                response = HttpUtils.makeHttpRequest(url, "GET", jwtToken);
-                return "Response: " + response;
-            default:
-                throw new InvalidCommandException("This command is invalid");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
+        return socket;
     }
 
 }
