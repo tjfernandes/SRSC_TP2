@@ -1,27 +1,28 @@
-package org.example;
+package org.example.utils;
 
 import java.io.Serial;
-import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
-public class TicketGrantingTicket implements Serializable {
+import javax.crypto.SecretKey;
+
+public class ServiceGrantingTicket {
+
     @Serial
     private static final long serialVersionUID = 1L;
 
     private final String clientId;
     private final String clientAddress;
-    private final String tgsServerIdentifier;
-    private final String keyClientTGS;
+    private final String serverIdentifier;
+    private final SecretKey keyClientServer;
     private final LocalDateTime issueTime;
     private final Duration lifetime;
 
-    public TicketGrantingTicket(String clientId, String clientAddress, String tgsServerIdentifier, String keyClientTGS) {
+    public ServiceGrantingTicket(String clientId, String clientAddress, String serverIdentifier, SecretKey keyClientServer) {
         this.clientId = clientId;
         this.clientAddress = clientAddress;
-        this.tgsServerIdentifier = tgsServerIdentifier;
-        this.keyClientTGS = keyClientTGS;
+        this.serverIdentifier = serverIdentifier;
+        this.keyClientServer = keyClientServer;
         this.issueTime = LocalDateTime.now();
         this.lifetime = Duration.ofHours(8); // TGT validity period
     }
@@ -30,12 +31,12 @@ public class TicketGrantingTicket implements Serializable {
         return clientAddress;
     }
 
-    public String getTgsServerIdentifier() {
-        return tgsServerIdentifier;
+    public String getServerIdentifier() {
+        return serverIdentifier;
     }
 
-    public String getKey() {
-        return keyClientTGS;
+    public SecretKey getKey() {
+        return keyClientServer;
     }
 
     public LocalDateTime getIssueTime() {
@@ -50,5 +51,5 @@ public class TicketGrantingTicket implements Serializable {
         return this.clientId;
     }
 
-
+    
 }

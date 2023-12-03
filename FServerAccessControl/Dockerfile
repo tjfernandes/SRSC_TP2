@@ -6,6 +6,7 @@ COPY src/main/resources/keystore.jks keystore.jks
 COPY src/main/resources/truststore.jks truststore.jks
 COPY src/main/resources/dispatcher.cer dispatcher.cer
 COPY src/main/resources/access_control.cer access_control.cer
+COPY src/main/resources/keys.properties keys.properties
 
 EXPOSE 8082
 

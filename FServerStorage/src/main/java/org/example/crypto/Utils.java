@@ -1,4 +1,4 @@
-package org.example.Crypto;
+package org.example.crypto;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;

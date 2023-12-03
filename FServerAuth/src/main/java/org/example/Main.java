@@ -1,20 +1,26 @@
 package org.example;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
+
+import org.example.utils.RequestMessage;
+import org.example.utils.ResponseMessage;
+import org.example.utils.TicketGrantingTicket;
 
 public class Main {
 
@@ -28,14 +34,18 @@ public class Main {
     public static final int PORT_2_DISPATCHER       = 8080;
     public static final int MY_PORT                 = 8081;
 
+    public static final String ALGORITHM            = "AES";
+    public static final int KEYSIZE                 = 256;
+
 
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
+        Authentication authentication = new Authentication();
         while (true) {
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket));
+                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket, authentication));
                 clientThread.start();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -43,10 +53,67 @@ public class Main {
         }
     }
 
+    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket,Authentication authentication){
+       try {
+
+            ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
+
+            RequestMessage requestMessage;
+            while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
+                ResponseMessage response = null;
+                
+                if(authentication.login(requestMessage.getClientId(), requestMessage.getClientPassword())){
+                    
+                    KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
+                    kg.init(KEYSIZE);
+
+                    SecretKey generatedkey = kg.generateKey();
+                
+
+                    TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,"ACCESS_CONTROL", generatedkey);
+                    
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    ObjectOutputStream out = null;
+                    try {
+                        out = new ObjectOutputStream(bos);   
+                        out.writeObject(tgt);
+                        out.flush();
+                        byte[] tgtBytes = bos.toByteArray();
+
+                        response = new ResponseMessage(generatedkey,tgtBytes);
+                    } catch (IOException e ) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            bos.close();
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }else{
+                     response = new ResponseMessage(null,null);
+                }
+                
+                objectOutputStream.writeObject(response);
+                objectOutputStream.flush();
+            }
+
+            objectOutputStream.close();
+            objectInputStream.close();
+            requestSocket.close();
+
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e1) {
+            e1.printStackTrace();
+        }
+    }
+
+
     private static SSLServerSocket server() {
 
         try {
-
             //KeyStore
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
@@ -73,30 +140,5 @@ public class Main {
             e.printStackTrace();
         }
         return null;
-    }
-
-    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket) {
-        try {
-            // Communication logic with the request
-            BufferedReader reader = new BufferedReader(new InputStreamReader(requestSocket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(requestSocket.getOutputStream()));
-
-            String message;
-            while ((message = reader.readLine()) != null) {
-                System.out.println("Received message: " + message);
-
-                // Example response
-                writer.write("Server Auth received your message: " + message);
-                writer.newLine();
-                writer.flush();
-            }
-
-            writer.close();
-            reader.close();
-            requestSocket.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 }
