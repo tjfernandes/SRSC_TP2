@@ -3,7 +3,6 @@ package org.example.crypto;
 import java.security.Key;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
-import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
 
 
@@ -56,12 +55,5 @@ public class CryptoStuff {
         } catch ( BadPaddingException | IllegalBlockSizeException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException ex) {
             throw new CryptoException("Error encrypting/decrypting data" + ex.getMessage());
         }
-    }
-
-    private byte[] generateRandomIV() {
-        SecureRandom secureRandom = new SecureRandom();
-        byte[] iv = new byte[12]; // 96 bits IV for AES-GCM
-        secureRandom.nextBytes(iv);
-        return iv;
     }
 }

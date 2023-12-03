@@ -10,13 +10,19 @@ public class RequestMessage implements Serializable {
     private final String clientId;
     private final String serviceId;
     private final String clientAddress;
+    private final String clientPassword;
     private final int nonce;
 
-    public RequestMessage(String clientId,String clientAddress ,String serviceId, int nonce) {
+    public RequestMessage(String clientId,String clientAddress, String clientPassword ,String serviceId ,int nonce) {
         this.clientId = clientId;
         this.serviceId = serviceId;
         this.nonce = nonce;
         this.clientAddress = clientAddress;
+        this.clientPassword = clientPassword;
+    }
+
+    public String getClientPassword() {
+        return this.clientPassword;
     }
 
     public String getClientId() {

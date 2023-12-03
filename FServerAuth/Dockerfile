@@ -7,6 +7,7 @@ COPY src/main/resources/truststore.jks truststore.jks
 COPY src/main/resources/dispatcher.cer dispatcher.cer
 COPY src/main/resources/authentication.cer authentication.cer
 COPY src/main/resources/crypto-config.properties crypto-config.properties
+COPY src/main/resources/users.txt users.txt
 
 EXPOSE 8081
 
