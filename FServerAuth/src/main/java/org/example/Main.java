@@ -2,9 +2,12 @@ package org.example;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -15,6 +18,9 @@ import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
+
+import org.example.utils.RequestMessage;
+import org.example.utils.ResponseMessage;
 
 public class Main {
 
@@ -41,6 +47,33 @@ public class Main {
             }
         }
     }
+
+    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket){
+       try {
+            // Communication logic with the request
+            ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
+            DataOutputStream dataOutputStream = new DataOutputStream(requestSocket.getOutputStream());
+
+            RequestMessage requestMessage;
+            while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
+
+                System.out.println("Received message: " + requestMessage);
+
+                // Create and send a response
+                String response = "Server Auth received your message: " + requestMessage;
+                dataOutputStream.writeUTF(response);
+                dataOutputStream.flush();
+            }
+
+            dataOutputStream.close();
+            objectInputStream.close();
+            requestSocket.close();
+
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     private static SSLServerSocket server() {
 
@@ -74,7 +107,7 @@ public class Main {
         return null;
     }
 
-    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket) {
+    private static void echoRequest(SSLSocket requestSocket, SSLServerSocket serverSocket) {
         try {
             // Communication logic with the request
             BufferedReader reader = new BufferedReader(new InputStreamReader(requestSocket.getInputStream()));

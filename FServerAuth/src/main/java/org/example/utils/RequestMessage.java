@@ -3,7 +3,7 @@ package org.example.utils;
 import java.io.Serial;
 import java.io.Serializable;
 
-public class RequestedMessage implements Serializable {
+public class RequestMessage implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -11,7 +11,7 @@ public class RequestedMessage implements Serializable {
     private final String serviceId;
     private final int nonce;
 
-    public RequestedMessage(String clientId, String serviceId, int nonce) {
+    public RequestMessage(String clientId, String serviceId, int nonce) {
         this.clientId = clientId;
         this.serviceId = serviceId;
         this.nonce = nonce;
@@ -27,5 +27,14 @@ public class RequestedMessage implements Serializable {
 
     public int getNonce() {
         return nonce;
+    }
+
+    @Override
+    public String toString() {
+    return "RequestMessage{" +
+            "clientId='" + clientId + '\'' +
+            ", serviceId='" + serviceId + '\'' +
+            ", nonce=" + nonce +
+            '}';
     }
 }

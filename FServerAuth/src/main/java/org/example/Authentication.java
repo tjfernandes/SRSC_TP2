@@ -4,6 +4,8 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.example.utils.User;
+
 public class Authentication {
     private static final String FILE_PATH = "./users.txt";
     private Map<String, User> users;
@@ -21,6 +23,7 @@ public class Authentication {
             }
         }
     }
+    
     public boolean register(String username, String password) {
         try {
             User user = new User(username, password);

@@ -1,7 +1,13 @@
 package org.example;
 
 import com.sun.net.httpserver.*;
+
+import okhttp3.Request;
+
 import javax.net.ssl.*;
+
+import org.example.utils.RequestMessage;
+
 import java.io.*;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
@@ -47,22 +53,48 @@ public class MainDispatcher {
     public static void main(String[] args) throws Exception {
         boolean runStorage = true;
         boolean runAuthentication = true;
-        while(runStorage) {
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        /*while(runStorage) {
             try {
                 sendMessage(ModuleName.STORAGE);
                 runStorage = false;
             } catch (Exception e) {
                 System.out.println("Failed to connect to storage server");
             }
-        }
+        }*/
         while(runAuthentication) {
             try {
-                sendMessage(ModuleName.AUTHENTICATION);
+                //sendMessage(ModuleName.AUTHENTICATION);
                 runAuthentication = false;
             } catch (Exception e) {
                 System.out.println("Failed to connect to auth server");
             }
-        }    
+        }  
+        
+        RequestMessage requestMessage = new RequestMessage("client1", "service1", 1234);
+
+        SSLSocket socket = initTLSSocket(ModuleName.AUTHENTICATION);
+
+        // Communication logic with the server
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
+
+        // Send the message
+        objectOutputStream.writeObject(requestMessage);
+        objectOutputStream.flush();
+
+        // Get the input stream
+BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+        // Read the server's response
+        String response = reader.readLine();
+        System.out.println("Server response: " + response);
+
+
+        socket.close();
     }
 
     private static void sendMessage(ModuleName moduleName) throws IOException {

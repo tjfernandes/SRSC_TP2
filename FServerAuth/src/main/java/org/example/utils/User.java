@@ -1,4 +1,4 @@
-package org.example;
+package org.example.utils;
 
 import java.io.Serializable;
 import java.security.MessageDigest;
@@ -36,7 +36,7 @@ public class User implements Serializable {
         return sb.toString();
     }
 
-    String hashPassword(String password, byte[] salt) throws NoSuchAlgorithmException {
+    public String hashPassword(String password, byte[] salt) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance(HASHING_ALGORITHMS);
         md.update(salt);
         byte[] bytes = md.digest(password.getBytes());

@@ -1,4 +1,4 @@
-package org.example;
+package org.example.utils;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -48,6 +48,4 @@ public class TicketGrantingTicket implements Serializable {
     public String getClientId() {
         return this.clientId;
     }
-
-
 }
