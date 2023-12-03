@@ -14,7 +14,7 @@ image_exists() {
 remove_container_if_exists() {
     if container_exists "$1"; then
         docker stop "$1"
-        docker rm "$1"
+        docker rm -f "$1"
     else
         echo "Container $1 does not exist."
     fi
