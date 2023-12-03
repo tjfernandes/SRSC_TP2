@@ -1,4 +1,4 @@
-package org.example;
+package org.example.Utils;
 
 import java.io.Serial;
 import java.time.Duration;

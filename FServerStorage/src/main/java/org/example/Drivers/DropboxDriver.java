@@ -54,7 +54,8 @@ public class DropboxDriver {
         DbxRequestConfig config = DbxRequestConfig.newBuilder(appName).build();
         try {
             DbxClientV2 client = new DbxClientV2(config, accessToken);
-            Metadata metadata = client.files().createFolder(basePath+path);
+            CreateFolderResult result = client.files().createFolderV2(basePath + path);
+            Metadata metadata = result.getMetadata();
             System.out.println("Folder created: " + metadata.getPathDisplay());
         } catch (DbxException e) {
             e.printStackTrace();

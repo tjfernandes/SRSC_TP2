@@ -28,7 +28,6 @@ public class Main {
     public static final int PORT_2_DISPATCHER       = 8080;
     public static final int MY_PORT                 = 8081;
 
-
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);

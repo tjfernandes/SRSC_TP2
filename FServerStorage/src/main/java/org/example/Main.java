@@ -1,14 +1,7 @@
 package org.example;
 
 import java.io.*;
-import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Enumeration;
 import java.security.cert.Certificate;
@@ -27,7 +20,7 @@ public class Main {
     public static final int MY_PORT                 = 8083;
 
     
-
+/*
     public static void test() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
 
         String inputFilePath = "src/main/java/ola.txt";
@@ -49,17 +42,9 @@ public class Main {
             System.out.println(file);
         }
     }
- 
+  */
     public static void main(String[] args) {
        initTLSSocket();
-
-       try {
-        test();
-    } catch (NoSuchAlgorithmException e) {
-        e.printStackTrace();
-    } catch (InvalidAlgorithmParameterException e) {
-        e.printStackTrace();
-    }
     }
 
     private static void initTLSSocket(){
