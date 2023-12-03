@@ -3,6 +3,8 @@ package org.example;
 import com.sun.net.httpserver.*;
 import javax.net.ssl.*;
 import java.io.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -45,6 +47,9 @@ public class MainDispatcher {
     }
 
     public static void main(String[] args) throws Exception {
+        //initTLSServerSocket();
+
+
         boolean runStorage = true;
         boolean runAuthentication = true;
         while(runStorage) {
@@ -62,14 +67,109 @@ public class MainDispatcher {
             } catch (Exception e) {
                 System.out.println("Failed to connect to auth server");
             }
-        }    
+        }
+    }
+
+    private static void initTLSServerSocket() {
+        try {
+            //Keystore
+            KeyStore ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
+
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
+
+
+            // SSLContext
+            SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
+            sslContext.init(kmf.getKeyManagers(), null, new SecureRandom());
+
+            SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
+
+            serverSocket.setEnabledProtocols(CONFPROTOCOLS);
+            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+
+            System.out.println("Server is listening on port 8080...");
+
+            while (true) {
+                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+                System.out.println("ENTROU");
+                Thread clientThread = new Thread(() -> handleRequest(clientSocket));
+                clientThread.start();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void handleRequest(SSLSocket clientSocket) {
+        try {
+            System.out.println("ENTROU handle request");
+            // Communication logic with the client
+            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+
+            String command = reader.readLine();
+
+            if (command != null) {
+                System.out.println("Received command: " + command);
+
+                writer.write(command);
+                writer.newLine();
+                writer.flush();
+
+//                String[] fullCommand = command.split("\\s+");
+//
+//                String commandName = fullCommand[0];
+//
+//                String username = "";
+//                String path = "";
+//                String file = "";
+//                switch (commandName) {
+//                    case "login":
+//                        username = fullCommand[1];
+//                        String password = fullCommand[2];
+//
+//                    case "ls":
+//                        username = fullCommand[1];
+//                        path = fullCommand[2];
+//                    case "mkdir":
+//                        username = fullCommand[1];
+//                        path = fullCommand[2];
+//                    case "put":
+//                        username = fullCommand[1];
+//                        file = fullCommand[2];
+//                    case "get":
+//                        username = fullCommand[1];
+//                        file = fullCommand[2];
+//                    case "cp":
+//                        username = fullCommand[1];
+//                        String file1 = fullCommand[2];
+//                        String file2 = fullCommand[3];
+//                    case "rm":
+//                        username = fullCommand[1];
+//                        file = fullCommand[2];
+//                    case "file":
+//                        file = fullCommand[1];
+//                    default: break;
+//                }
+            } else System.out.println("CONA");
+
+            writer.close();
+            reader.close();
+            clientSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static void sendMessage(ModuleName moduleName) throws IOException {
         
-        SSLSocket socket = initTLSSocket(moduleName);
+        SSLSocket socket = initTLSClientSocket(moduleName);
 
-         // Communication logic with the server
+        // Communication logic with the server
         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
@@ -84,28 +184,10 @@ public class MainDispatcher {
         System.out.println("Server response: " + response);
 
         socket.close();
+
     }
 
-    static class LoginHandler implements HttpHandler {
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String query = exchange.getRequestURI().getQuery();
-            Map<String, String> queryParams = parseQueryParams(query);
-
-            String username = queryParams.get("username");
-            String password = queryParams.get("password");
-
-
-            String response = "Username: " + username + "\nPassword: " + password;
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    private static SSLSocket initTLSSocket(ModuleName module) {
+    private static SSLSocket initTLSClientSocket(ModuleName module) {
         SSLSocket socket = null;
         try {
             String[] hostAndPort = getHostAndPort(module);
@@ -121,13 +203,13 @@ public class MainDispatcher {
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
             Enumeration<String> aliases = trustStore.aliases();
 
-            while (aliases.hasMoreElements()) {
-                String alias = aliases.nextElement();
-                Certificate certificate = trustStore.getCertificate(alias);
-                System.out.println("Alias: " + alias);
-                System.out.println("Certificate: " + certificate.toString());
-            }
-            
+//            while (aliases.hasMoreElements()) {
+//                String alias = aliases.nextElement();
+//                Certificate certificate = trustStore.getCertificate(alias);
+//                System.out.println("Alias: " + alias);
+//                System.out.println("Certificate: " + certificate.toString());
+//            }
+
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
@@ -139,8 +221,11 @@ public class MainDispatcher {
 
             System.out.println(hostAndPort[0]);
             System.out.println(hostAndPort[1]);
-            
+
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
+
+            socket.setEnabledProtocols(CONFPROTOCOLS);
+            //socket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
             // Start the handshake
             socket.startHandshake();
@@ -160,7 +245,7 @@ public class MainDispatcher {
             e.printStackTrace();
         } catch (CertificateException e) {
             e.printStackTrace();
-        } catch (KeyManagementException e) { 
+        } catch (KeyManagementException e) {
             e.printStackTrace();
         } catch (UnrecoverableKeyException e) {
             e.printStackTrace();
@@ -168,94 +253,6 @@ public class MainDispatcher {
         return socket;
     }
 
-    static class ListHandler implements HttpHandler {
 
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the list page!";
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    static class MakeDirHandler implements HttpHandler {
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the make dir page!";
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    static class PutHandler implements HttpHandler {
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the put page!";
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    static class GetHandler implements HttpHandler {
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the get page!";
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    static class CopyHandler implements HttpHandler {
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the copy page!";
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    static class RemoveHandler implements HttpHandler {
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the remove page!";
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    static class FileHandler implements HttpHandler {
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String response = "This is the file page!";
-            exchange.sendResponseHeaders(200, response.length());
-            OutputStream os = exchange.getResponseBody();
-            os.write(response.getBytes());
-            os.close();
-        }
-    }
-
-    private static Map<String, String> parseQueryParams(String query) {
-        return java.util.Arrays.stream(query.split("&"))
-                .map(s -> s.split("="))
-                .collect(java.util.stream.Collectors.toMap(a -> a[0], a -> a.length > 1 ? a[1] : ""));
-    }
 
 }
