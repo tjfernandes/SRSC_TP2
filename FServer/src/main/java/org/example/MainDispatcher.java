@@ -45,8 +45,24 @@ public class MainDispatcher {
     }
 
     public static void main(String[] args) throws Exception {
-        sendMessage(ModuleName.STORAGE);
-        sendMessage(ModuleName.AUTHENTICATION);
+        boolean runStorage = true;
+        boolean runAuthentication = true;
+        while(runStorage) {
+            try {
+                sendMessage(ModuleName.STORAGE);
+                runStorage = false;
+            } catch (Exception e) {
+                System.out.println("Failed to connect to storage server");
+            }
+        }
+        while(runAuthentication) {
+            try {
+                sendMessage(ModuleName.AUTHENTICATION);
+                runAuthentication = false;
+            } catch (Exception e) {
+                System.out.println("Failed to connect to auth server");
+            }
+        }    
     }
 
     private static void sendMessage(ModuleName moduleName) throws IOException {

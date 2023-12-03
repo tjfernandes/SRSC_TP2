@@ -1,6 +1,7 @@
 package org.example;
 
 import java.io.*;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -97,9 +98,12 @@ public class Main {
 	        serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
             System.out.println("Server is listening on port 8083...");
-            SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-            System.out.println("Client connected");
-            handleRequest(clientSocket, serverSocket);  
+
+            while (true) {
+                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket));
+                clientThread.start();
+            }
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -125,7 +129,6 @@ public class Main {
             writer.close();
             reader.close();
             clientSocket.close();
-            serverSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

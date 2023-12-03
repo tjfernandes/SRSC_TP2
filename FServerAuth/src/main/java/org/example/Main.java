@@ -26,17 +26,20 @@ public class Main {
     public static final String TRUSTSTORE_PATH      = "/app/truststore.jks";
     public static final String TLS_VERSION          = "TLSv1.2";
     public static final int PORT_2_DISPATCHER       = 8080;
-    public static final int MY_PORT       = 8081;
+    public static final int MY_PORT                 = 8081;
 
 
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
-        try(SSLSocket requestSocket = (SSLSocket) serverSocket.accept()) {
-            System.out.println("Client connected");
-            handleRequest(requestSocket, serverSocket);
-        } catch (IOException e) {
-            e.printStackTrace();
+        while (true) {
+            try {
+                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket));
+                clientThread.start();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -62,7 +65,7 @@ public class Main {
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-	        serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);   
+	        serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
             
             return serverSocket;
 
@@ -91,7 +94,6 @@ public class Main {
             writer.close();
             reader.close();
             requestSocket.close();
-            serverSocket.close();
 
         } catch (IOException e) {
             e.printStackTrace();
