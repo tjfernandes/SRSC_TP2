@@ -68,7 +68,7 @@ public class Main {
                     KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
                     kg.init(KEYSIZE);
 
-                     SecretKey generatedkey = kg.generateKey();
+                    SecretKey generatedkey = kg.generateKey();
                 
 
                     TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,"ACCESS_CONTROL", generatedkey);

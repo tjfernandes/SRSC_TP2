@@ -4,6 +4,8 @@ import java.io.Serial;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+import javax.crypto.SecretKey;
+
 public class ServiceGrantingTicket {
 
     @Serial
@@ -12,11 +14,11 @@ public class ServiceGrantingTicket {
     private final String clientId;
     private final String clientAddress;
     private final String serverIdentifier;
-    private final String keyClientServer;
+    private final SecretKey keyClientServer;
     private final LocalDateTime issueTime;
     private final Duration lifetime;
 
-    public ServiceGrantingTicket(String clientId, String clientAddress, String serverIdentifier, String keyClientServer) {
+    public ServiceGrantingTicket(String clientId, String clientAddress, String serverIdentifier, SecretKey keyClientServer) {
         this.clientId = clientId;
         this.clientAddress = clientAddress;
         this.serverIdentifier = serverIdentifier;
@@ -33,7 +35,7 @@ public class ServiceGrantingTicket {
         return serverIdentifier;
     }
 
-    public String getKey() {
+    public SecretKey getKey() {
         return keyClientServer;
     }
 
