@@ -7,10 +7,16 @@ public class RequestMessage implements Serializable {
 
     private final ServiceGrantingTicket sgt;
     private final byte[] authenticator;
+    private final Command command;
 
-    public RequestMessage(ServiceGrantingTicket sgt, byte[] authenticator) {
+    public RequestMessage(ServiceGrantingTicket sgt, byte[] authenticator,Command command) {
         this.sgt = sgt;
         this.authenticator = authenticator;
+        this.command = command;
+    }
+
+    public Command getCommand() {
+        return command;
     }
 
     public ServiceGrantingTicket getSgt() {
