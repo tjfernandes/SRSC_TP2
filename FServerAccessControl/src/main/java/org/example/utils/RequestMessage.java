@@ -9,6 +9,7 @@ public class RequestMessage implements Serializable {
     private final String serviceId;
     private final byte[] authenticator;
 
+
     public RequestMessage(TicketGrantingTicket tgt, String serviceId, byte[] authenticator) {
         this.tgt = tgt;
         this.serviceId = serviceId;
