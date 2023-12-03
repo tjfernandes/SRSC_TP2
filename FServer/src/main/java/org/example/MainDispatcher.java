@@ -1,11 +1,8 @@
 package org.example;
 
-import com.kenai.jffi.Main;
 import com.sun.net.httpserver.*;
-
 import javax.net.ssl.*;
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -25,25 +22,36 @@ public class MainDispatcher {
         ACCESS_CONTROL
     }
 
+    public static final String[] CONFPROTOCOLS      = {"TLSv1.2"};;
+    public static final String[] CONFCIPHERSUITES   = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
+    public static final String KEYSTORE_PASSWORD    = "dispatcher_password";
+    public static final String KEYSTORE_PATH        = "/app/keystore.jks";
+    public static final String TRUSTSTORE_PASSWORD  = "dispatcher_truststore_password";
+    public static final String TRUSTSTORE_PATH      = "/app/truststore.jks";
+    public static final String TLS_VERSION          = "TLSv1.2";
+    public static final int MY_PORT                 = 8080;
+
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
             case STORAGE:
-                return new String[]{"localhost", "8084"};
+                return new String[]{"172.17.0.1", "8083"};
             case AUTHENTICATION:
-                return new String[]{"localhost", "8086"};
+                return new String[]{"172.17.0.1", "8081"};
             case ACCESS_CONTROL:
-                return new String[]{"localhost", "8085"};
+                return new String[]{"172.17.0.1", "8082"};
             default:
                 throw new IllegalArgumentException("Invalid module name");
         }
     }
 
     public static void main(String[] args) throws Exception {
-        int port = 8080;
+        sendMessage(ModuleName.STORAGE);
+        sendMessage(ModuleName.AUTHENTICATION);
+    }
 
-        System.out.println("Server started on port " + port);
-        //SSLSocket socket = initTLSSocket("172.17.0.1", 8083);
-        SSLSocket socket = initTLSSocket(ModuleName.STORAGE);
+    private static void sendMessage(ModuleName moduleName) throws IOException {
+        
+        SSLSocket socket = initTLSSocket(moduleName);
 
          // Communication logic with the server
         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -60,33 +68,6 @@ public class MainDispatcher {
         System.out.println("Server response: " + response);
 
         socket.close();
-    }
-
-
-    private static HttpsServer createHttpsServer(int port) throws Exception {
-        // Load keystore
-        char[] keyStorePassword = "".toCharArray();
-        char[] keyPassword = "".toCharArray();
-
-        InputStream keyStoreIS = MainDispatcher.class.getClassLoader().getResourceAsStream("tfselfcertificate.jks");
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
-        keyStore.load(keyStoreIS, keyStorePassword);
-
-        final KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
-        keyManagerFactory.init(keyStore, keyStorePassword);
-
-        final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
-        trustManagerFactory.init(keyStore);
-
-        final SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
-
-
-        HttpsServer server = HttpsServer.create(new InetSocketAddress(port), 0);
-        server.setHttpsConfigurator(new HttpsConfigurator(sslContext));
-
-        return server;
-
     }
 
     static class LoginHandler implements HttpHandler {
@@ -113,21 +94,15 @@ public class MainDispatcher {
         try {
             String[] hostAndPort = getHostAndPort(module);
 
-            char[] keyStorePassword = "dispatcher_password".toCharArray();
-            char[] keyPassword = "dispatcher_password".toCharArray();
+            //KeyStore
             KeyStore ks = KeyStore.getInstance("JKS");
-            InputStream keystoreStream = Main.class.getResourceAsStream("/keystore.jks");
-            ks.load(keystoreStream, keyStorePassword);
-            System.out.println("keystore size:" + ks.size());
-
+            ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, keyPassword);
+            kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
-            // Load your keystore and truststore here
-            System.out.println("truststore loading...");
+            //TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            InputStream trustStoreStream = Main.class.getResourceAsStream("/truststore.jks");
-            trustStore.load(trustStoreStream, "dispatcher_truststore_password".toCharArray());
+            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
             Enumeration<String> aliases = trustStore.aliases();
 
             while (aliases.hasMoreElements()) {
@@ -141,10 +116,13 @@ public class MainDispatcher {
             trustManagerFactory.init(trustStore);
 
             // Set up the SSLContext
-            SSLContext sslContext = SSLContext.getInstance("TLS");
+            SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+
+            System.out.println(hostAndPort[0]);
+            System.out.println(hostAndPort[1]);
             
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
 
@@ -169,7 +147,6 @@ public class MainDispatcher {
         } catch (KeyManagementException e) { 
             e.printStackTrace();
         } catch (UnrecoverableKeyException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         return socket;

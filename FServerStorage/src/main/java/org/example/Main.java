@@ -18,11 +18,12 @@ public class Main {
     public static final String[] CONFPROTOCOLS      = {"TLSv1.2"};;
     public static final String[] CONFCIPHERSUITES   = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
     public static final String KEYSTORE_PASSWORD    = "storage_password";
-    public static final String KEYSTORE_PATH        = "/keystore.jks";
+    public static final String KEYSTORE_PATH        = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD  = "storage_truststore_password";
-    public static final String TRUSTSTORE_PATH      = "/truststore.jks";
+    public static final String TRUSTSTORE_PATH      = "/app/truststore.jks";
     public static final String TLS_VERSION          = "TLSv1.2";
-    public static final int PORT_2_DISPATCHER       = 8084;
+    public static final int PORT_2_DISPATCHER       = 8080;
+    public static final int MY_PORT                 = 8083;
 
     
 
@@ -49,7 +50,8 @@ public class Main {
     }
  
     public static void main(String[] args) {
-       //initTLSSocket();
+       initTLSSocket();
+
        try {
         test();
     } catch (NoSuchAlgorithmException e) {
@@ -64,17 +66,14 @@ public class Main {
         try {
             //Keystore
             KeyStore ks = KeyStore.getInstance("JKS");
-            InputStream keystoreStream = Main.class.getResourceAsStream(KEYSTORE_PATH);
-            ks.load(keystoreStream, KEYSTORE_PASSWORD
-            .toCharArray());
+            ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
 
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
             //TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            InputStream trustStoreStream = Main.class.getResourceAsStream(TRUSTSTORE_PATH);
-            trustStore.load(trustStoreStream, TRUSTSTORE_PASSWORD.toCharArray());
+            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
             Enumeration<String> aliases = trustStore.aliases();
 
             //Print all certificates in truststore
@@ -93,13 +92,14 @@ public class Main {
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
 
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
-            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(PORT_2_DISPATCHER);
+            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
 	        serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
-            System.out.println("Server is listening on socket...");
+            System.out.println("Server is listening on port 8083...");
             SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                handleRequest(clientSocket, serverSocket);  
+            System.out.println("Client connected");
+            handleRequest(clientSocket, serverSocket);  
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -117,7 +117,7 @@ public class Main {
                 System.out.println("Received message: " + message);
 
                 // Example response
-                writer.write("Server received your message: " + message);
+                writer.write("Server Storage received your message: " + message);
                 writer.newLine();
                 writer.flush();
             }
