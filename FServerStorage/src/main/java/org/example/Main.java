@@ -1,7 +1,9 @@
 package org.example;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
@@ -9,13 +11,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Enumeration;
 import java.security.cert.Certificate;
-import org.example.Crypto.*;
-
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
 import javax.net.ssl.*;
-
-import org.example.Drivers.LocalFileSystemDriver;
 
 public class Main {
 
@@ -28,40 +24,13 @@ public class Main {
     public static final String TLS_VERSION          = "TLSv1.2";
     public static final int PORT_2_DISPATCHER       = 8084;
 
-    public void lsCommand() {
-
-    }
-
-    public void putCommand() {
-
-    }
-
-    public void getCommand() {
-
-    }
-
-    public void mkdirCommand() {
-
-    }
-
-    public void rmCommand() {
-
-    }
-
-    public void cpCommand() {
-
-    }
+    
 
     public static void test() throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
-        String cryptoConfigFilePath = "src/main/java/crypto-config.properties";
+
         String inputFilePath = "src/main/java/ola.txt";
-        String uploadTargetPath = "ola.txt";
-
-        // Create an instance of CryptoStuff
-        CryptoStuff crypto = null;
-        crypto = CryptoStuff.getInstance();
-
-        // Read the file content as a byte array
+        String uploadTargetPath = "bombs.txt";
+        
         byte[] fileContent;
         try {
             fileContent = Files.readAllBytes(Paths.get(inputFilePath));
@@ -70,43 +39,13 @@ public class Main {
             return;
         }
 
-        // Encrypt the file content
-        byte[] encryptedContent;
-        try {
-            KeyGenerator kg = KeyGenerator.getInstance("AES");
-            kg.init(256);
-            SecretKey key = kg.generateKey();
-            encryptedContent = crypto.encrypt(key, fileContent);
-        } catch (CryptoException e) {
-            e.printStackTrace();
-            return;
+        FsManager fsManager = new FsManager();
+
+        var a = fsManager.lsCommand("");
+    
+        for (String file : a) {
+            System.out.println(file);
         }
-
-        // Now, you can upload the encrypted content
-        LocalFileSystemDriver fs = new LocalFileSystemDriver("src/main/java/filesystem-config.properties");
-        fs.uploadFile(Utils.toHex(encryptedContent).getBytes(), uploadTargetPath);
-
-        // Download the file content as a byte array
-        //byte[] downloadedContent = fs.downloadFile(uploadTargetPath);
-
-        // Decrypt the downloaded content
-        byte[] decryptedContent;
-        try {
-            KeyGenerator kg = KeyGenerator.getInstance("AES");
-            kg.init(256);
-            SecretKey key = kg.generateKey();
-            decryptedContent = crypto.decrypt(key, encryptedContent);
-        } catch (CryptoException e) {
-            e.printStackTrace();
-            return;
-        }
-
-        // Convert decrypted content to hex byte array
-        byte[] decryptedHexByteArray = Utils.bytesToHexByteArray(decryptedContent);
-
-        // Print the decrypted content as hex byte array
-        System.out.println("Decrypted (Hex Byte Array): " + Utils.toHex(decryptedHexByteArray));
-
     }
  
     public static void main(String[] args) {
@@ -114,10 +53,8 @@ public class Main {
        try {
         test();
     } catch (NoSuchAlgorithmException e) {
-        // TODO Auto-generated catch block
         e.printStackTrace();
     } catch (InvalidAlgorithmParameterException e) {
-        // TODO Auto-generated catch block
         e.printStackTrace();
     }
     }

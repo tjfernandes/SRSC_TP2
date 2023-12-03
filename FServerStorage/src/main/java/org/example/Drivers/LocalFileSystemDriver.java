@@ -3,13 +3,16 @@ package org.example.Drivers;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Stream;
 
 public class LocalFileSystemDriver {
     private final String basePath;
+
 
     public LocalFileSystemDriver(String configFilePath) {
         Properties properties = loadProperties(configFilePath);
@@ -27,8 +30,12 @@ public class LocalFileSystemDriver {
     }
 
     public void uploadFile(byte[] fileContent, String targetFilePath) {
+    try {
+        Path path = Paths.get(basePath + targetFilePath);
+        Files.createDirectories(path.getParent());
+
         try (ByteArrayInputStream in = new ByteArrayInputStream(fileContent);
-             FileOutputStream out = new FileOutputStream(basePath + targetFilePath)) {
+             FileOutputStream out = new FileOutputStream(path.toString())) {
             byte[] buffer = new byte[1024];
             int bytesRead;
             while ((bytesRead = in.read(buffer)) != -1) {
@@ -38,7 +45,10 @@ public class LocalFileSystemDriver {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    } catch (IOException e) {
+        System.out.println("Error creating directories: " + e.getMessage());
     }
+}
 
 
     public void createFolder(String path) {
@@ -64,10 +74,15 @@ public class LocalFileSystemDriver {
     public List<String> listFolder(String path) {
         List<String> fileList = new ArrayList<>();
         Path folderPath = Path.of(basePath + path);
-        try {
-            Files.walk(folderPath)
-                    .filter(Files::isRegularFile)
-                    .forEach(file -> fileList.add(file.toString()));
+        try (Stream<Path> paths = Files.list(folderPath)) {
+            paths.forEach(p -> {
+                String fileName = p.getFileName().toString();
+                if (Files.isDirectory(p)) {
+                    fileList.add(fileName + " (Directory)");
+                } else {
+                    fileList.add(fileName);
+                }
+            });
             return fileList;
         } catch (IOException e) {
             e.printStackTrace();

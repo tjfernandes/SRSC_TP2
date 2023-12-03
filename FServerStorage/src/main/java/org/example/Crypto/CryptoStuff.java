@@ -4,9 +4,7 @@ package org.example.Crypto;
 import java.security.Key;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
-import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
-
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
@@ -26,6 +24,8 @@ public class CryptoStuff {
 
     private GCMParameterSpec gcmParameterSpec;
 
+    private static final String TRANSFORMATION = "AES/GCM/NoPadding";
+
     private CryptoStuff() {
       gcmParameterSpec = new GCMParameterSpec(128, ivBytes);
     }
@@ -41,14 +41,14 @@ public class CryptoStuff {
         return doCrypto(Cipher.ENCRYPT_MODE, key, inputBytes);
     }
 
-    public byte[] decrypt(Key key, byte[] inputBytes) throws CryptoException, InvalidAlgorithmParameterException {
+    public byte[] decrypt(Key key,byte[] inputBytes) throws CryptoException, InvalidAlgorithmParameterException {
         return doCrypto(Cipher.DECRYPT_MODE, key, inputBytes);
     }
 
     private byte[]  doCrypto(int cipherMode, Key key, byte[] inputBytes)
             throws CryptoException, InvalidAlgorithmParameterException {
         try {
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             
             cipher.init(cipherMode, key, gcmParameterSpec);
 
@@ -57,12 +57,5 @@ public class CryptoStuff {
         } catch ( BadPaddingException | IllegalBlockSizeException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException ex) {
             throw new CryptoException("Error encrypting/decrypting data" + ex.getMessage());
         }
-    }
-
-    private byte[] generateRandomIV() {
-        SecureRandom secureRandom = new SecureRandom();
-        byte[] iv = new byte[12]; // 96 bits IV for AES-GCM
-        secureRandom.nextBytes(iv);
-        return iv;
     }
 }
