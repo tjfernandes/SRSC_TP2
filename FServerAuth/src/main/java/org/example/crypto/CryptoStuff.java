@@ -1,21 +1,22 @@
-package org.example.Crypto;
+package org.example.crypto;
 
-import java.security.Key;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
-import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
-
+import java.security.SecureRandom;
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class CryptoStuff {
 
     private static CryptoStuff instance;
+
+    private static final int KEY_SIZE = 128; 
 
     private static final byte[] ivBytes  = new byte[]
      {
@@ -26,7 +27,7 @@ public class CryptoStuff {
     private GCMParameterSpec gcmParameterSpec;
 
     private CryptoStuff() {
-      gcmParameterSpec = new GCMParameterSpec(128, ivBytes);
+        gcmParameterSpec = new GCMParameterSpec(128, ivBytes);
     }
 
     public static CryptoStuff getInstance() {
@@ -36,20 +37,22 @@ public class CryptoStuff {
         return instance;
     }
 
-    public byte[] encrypt(Key key, byte[] inputBytes) throws CryptoException, InvalidAlgorithmParameterException {
+    public byte[] encrypt(byte[] key, byte[] inputBytes) throws CryptoException, InvalidAlgorithmParameterException {
         return doCrypto(Cipher.ENCRYPT_MODE, key, inputBytes);
     }
 
-    public byte[] decrypt(Key key, byte[] inputBytes) throws CryptoException, InvalidAlgorithmParameterException {
+    public byte[] decrypt(byte[] key, byte[] inputBytes) throws CryptoException, InvalidAlgorithmParameterException {
         return doCrypto(Cipher.DECRYPT_MODE, key, inputBytes);
     }
 
-    private byte[]  doCrypto(int cipherMode, Key key, byte[] inputBytes)
+    private byte[]  doCrypto(int cipherMode, byte[] key, byte[] inputBytes)
             throws CryptoException, InvalidAlgorithmParameterException {
         try {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+
+            SecretKeySpec secretKey = new SecretKeySpec(key, "AES");
             
-            cipher.init(cipherMode, key, gcmParameterSpec);
+            cipher.init(cipherMode, secretKey, gcmParameterSpec);
 
             return cipher.doFinal(inputBytes);
 
@@ -58,10 +61,10 @@ public class CryptoStuff {
         }
     }
 
-    private byte[] generateRandomIV() {
+    public byte[] getSecureRandomKey() {
+        byte[] secureRandomKeyBytes = new byte[KEY_SIZE / 8];
         SecureRandom secureRandom = new SecureRandom();
-        byte[] iv = new byte[12]; // 96 bits IV for AES-GCM
-        secureRandom.nextBytes(iv);
-        return iv;
+        secureRandom.nextBytes(secureRandomKeyBytes);
+        return secureRandomKeyBytes;
     }
 }
