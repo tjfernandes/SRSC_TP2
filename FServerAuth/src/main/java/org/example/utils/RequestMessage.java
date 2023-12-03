@@ -9,16 +9,22 @@ public class RequestMessage implements Serializable {
 
     private final String clientId;
     private final String serviceId;
+    private final String clientAddress;
     private final int nonce;
 
-    public RequestMessage(String clientId, String serviceId, int nonce) {
+    public RequestMessage(String clientId,String clientAddress ,String serviceId, int nonce) {
         this.clientId = clientId;
         this.serviceId = serviceId;
         this.nonce = nonce;
+        this.clientAddress = clientAddress;
     }
 
     public String getClientId() {
         return this.clientId;
+    }
+
+    public String getClientAddress() {
+        return this.clientAddress;
     }
 
     public String getServiceId() {

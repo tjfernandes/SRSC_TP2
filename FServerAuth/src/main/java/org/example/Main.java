@@ -5,13 +5,17 @@ import java.io.BufferedWriter;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+import java.util.Properties;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -19,8 +23,10 @@ import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
 
+import org.example.crypto.CryptoStuff;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
+import org.example.utils.TicketGrantingTicket;
 
 public class Main {
 
@@ -33,6 +39,10 @@ public class Main {
     public static final String TLS_VERSION          = "TLSv1.2";
     public static final int PORT_2_DISPATCHER       = 8080;
     public static final int MY_PORT                 = 8081;
+
+    public static final String ALGORITHM            = "AES";
+    public static final int KEYSIZE                 = 256;
+
 
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
@@ -52,20 +62,32 @@ public class Main {
        try {
             // Communication logic with the request
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
-            DataOutputStream dataOutputStream = new DataOutputStream(requestSocket.getOutputStream());
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
 
             RequestMessage requestMessage;
             while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
+                Properties properties = loadProperties("/app/crypto-config.properties");
+                String tgskey = properties.getProperty("TGS_AS_KEY");
 
-                System.out.println("Received message: " + requestMessage);
+                CryptoStuff cryptoStuff = CryptoStuff.getInstance();        
 
-                // Create and send a response
-                String response = "Server Auth received your message: " + requestMessage;
-                dataOutputStream.writeUTF(response);
-                dataOutputStream.flush();
+                KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
+                kg.init(KEYSIZE);
+
+                SecretKey generatedkey = kg.generateKey();
+                
+                SecureRandom secureRandom = new SecureRandom();
+                int nonce = secureRandom.nextInt();
+
+                TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,"ACCESS_CONTROL", nonce);
+                
+                ResponseMessage response = new ResponseMessage(cryptoStuff.encrypt(tgskey, tgt), generatedkey);
+                
+                objectOutputStream.writeUTF(response);
+                objectOutputStream.flush();
             }
 
-            dataOutputStream.close();
+            objectOutputStream.close();
             objectInputStream.close();
             requestSocket.close();
 
@@ -130,5 +152,15 @@ public class Main {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static Properties loadProperties(String configFilePath) {
+        Properties properties = new Properties();
+        try (InputStream input = new FileInputStream(configFilePath)) {
+            properties.load(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return properties;
     }
 }

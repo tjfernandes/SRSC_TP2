@@ -14,14 +14,12 @@ public class ResponseMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final byte[] generatedKey;
-    private final String serviceId;
     private final LocalDateTime issueTime;
     private final Duration lifetime;
     private byte[] encryptedTGT;
 
-    public ResponseMessage(byte[] generatedKey, String serviceId, byte[] encryptedTGT) {
+    public ResponseMessage(byte[] generatedKey, byte[] encryptedTGT) {
         this.generatedKey = generatedKey;
-        this.serviceId = serviceId;
         this.issueTime = LocalDateTime.now();
         this.lifetime = Duration.ofHours(8);
         this.encryptedTGT = null;
@@ -32,10 +30,6 @@ public class ResponseMessage implements Serializable {
         } catch (CryptoException e) {
             System.out.println("Error encrypting TGT: Invalid algorithm parameter");
         }
-    }
-
-    public String getServiceId() {
-        return this.serviceId;
     }
 
     public LocalDateTime getIssueTime() {
