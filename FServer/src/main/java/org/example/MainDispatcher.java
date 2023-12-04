@@ -1,13 +1,10 @@
 package org.example;
 
-import com.sun.net.httpserver.*;
-import org.example.utils.RequestMessage;
-import org.example.utils.ResponseMessage;
-
 import javax.net.ssl.*;
+
+import org.example.utils.Wrapper;
+
 import java.io.*;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -15,7 +12,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainDispatcher {
 
@@ -47,29 +45,20 @@ public class MainDispatcher {
         }
     }
 
+    // Create a map of ModuleName to SSLSocket
+    static Map<ModuleName, SSLSocket> socketMap = new HashMap<>();
+    // A map from request IDs to client sockets
+    private static Map<String, SSLSocket> clientSocketMap = new HashMap<>();
+
     public static void main(String[] args) throws Exception {
-        System.setProperty("javax.net.debug", "ssl");
-        initTLSServerSocket();
 
-
-//        boolean runStorage = true;
-//        boolean runAuthentication = true;
-//        while(runStorage) {
-//            try {
-//                sendMessage(ModuleName.STORAGE);
-//                runStorage = false;
-//            } catch (Exception e) {
-//                System.out.println("Failed to connect to storage server");
-//            }
-//        }
-//        while(runAuthentication) {
-//            try {
-//                sendMessage(ModuleName.AUTHENTICATION);
-//                runAuthentication = false;
-//            } catch (Exception e) {
-//                System.out.println("Failed to connect to auth server");
-//            }
-//        }
+        // Create a new thread to the client
+        new Thread(() -> initTLSServerSocket()).start();
+    
+        // Create a new thread for each module
+        new Thread(() -> initTLSClientSocket(ModuleName.STORAGE)).start();
+        new Thread(() -> initTLSClientSocket(ModuleName.AUTHENTICATION)).start();
+        new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
     }
 
     private static void initTLSServerSocket() {
@@ -79,13 +68,7 @@ public class MainDispatcher {
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
-
-            // KeyStore trustStore = KeyStore.getInstance("JKS");
-            // trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-
-            // TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            // trustManagerFactory.init(trustStore);
-
+    
             // SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), null, null);
@@ -93,165 +76,132 @@ public class MainDispatcher {
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
             serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
-
-            System.out.println("Server is listening on port 8080...");
-
+    
             while (true) {
-                SSLSocket socket = (SSLSocket) serverSocket.accept();
 
-                Thread clientThread = new Thread(() -> handleRequest(socket));
+
+                SSLSocket socket = (SSLSocket) serverSocket.accept();
+                ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
+                Wrapper message = (Wrapper) objectInputStream.readObject();
+    
+                Thread clientThread = new Thread(() -> clientHandleRequest(message, socket));
                 clientThread.start();
             }
-
+    
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static void handleRequest(SSLSocket socket) {
+    private static void clientHandleRequest(Wrapper request, SSLSocket clientSocket) {
         try {
-            System.out.println("ENTROU handle request");
-            // Communication logic with the client
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-
-            String command;
-            while((command = reader.readLine()) != null) {
-                System.out.println("Received command: " + command);
-
-                writer.write(command);
-                writer.newLine();
-                writer.flush();
-
-//                String[] fullCommand = command.split("\\s+");
-//
-//                String commandName = fullCommand[0];
-//
-//                String username = "";
-//                String path = "";
-//                String file = "";
-//                switch (commandName) {
-//                    case "login":
-//                        username = fullCommand[1];
-//                        String password = fullCommand[2];
-//
-//                    case "ls":
-//                        username = fullCommand[1];
-//                        path = fullCommand[2];
-//                    case "mkdir":
-//                        username = fullCommand[1];
-//                        path = fullCommand[2];
-//                    case "put":
-//                        username = fullCommand[1];
-//                        file = fullCommand[2];
-//                    case "get":
-//                        username = fullCommand[1];
-//                        file = fullCommand[2];
-//                    case "cp":
-//                        username = fullCommand[1];
-//                        String file1 = fullCommand[2];
-//                        String file2 = fullCommand[3];
-//                    case "rm":
-//                        username = fullCommand[1];
-//                        file = fullCommand[2];
-//                    case "file":
-//                        file = fullCommand[1];
-//                    default: break;
-//                }
+            // Choose the correct socket for this request
+            SSLSocket targetSocket = chooseSocket(request);
+            if (targetSocket == null) {
+                // Handle the case where there's no socket for this request
+                System.out.println("No socket for request: " + request);
+                return;
             }
-        } catch (IOException e) {
+    
+            // Forward the request to the correct socket
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(targetSocket.getOutputStream());
+            objectOutputStream.writeObject(request);
+            objectOutputStream.flush();
+    
+            // Wait for the response
+            ObjectInputStream objectInputStream = new ObjectInputStream(targetSocket.getInputStream());
+            Wrapper response = (Wrapper) objectInputStream.readObject();
+    
+            // Send the response back to the client
+            ObjectOutputStream clientOutputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+            clientOutputStream.writeObject(response);
+            clientOutputStream.flush();
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
-    private static void sendMessage(ModuleName moduleName) throws IOException {
-        
-        SSLSocket socket = initTLSClientSocket(moduleName);
-
-        // Communication logic with the server
-        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-
-        // Example message to send
-        String message = "Hello, Server!";
-        writer.write(message);
-        writer.newLine();
-        writer.flush();
-
-        // Read the server's response
-        String response = reader.readLine();
-        System.out.println("Server response: " + response);
-
-        socket.close();
-
+    private static SSLSocket chooseSocket(Wrapper request) {
+        byte type = request.getMessageType();
+    
+        // Choose the correct socket based on the message type
+        switch (type) {
+        case 1:
+            return socketMap.get(ModuleName.AUTHENTICATION);
+        case 3:
+            return socketMap.get(ModuleName.ACCESS_CONTROL);
+        case 6:
+            return socketMap.get(ModuleName.STORAGE);
+        default:
+            System.out.println("Invalid message type: " + type);
+            return null;
+        }
     }
 
-    private static SSLSocket initTLSClientSocket(ModuleName module) {
+    private static void handleRequest(Wrapper response) {
+        try {
+            // Get the client socket for this response
+            SSLSocket clientSocket = clientSocketMap.get(response.getRequestId());
+            if (clientSocket == null) {
+                // Handle the case where there's no client socket for this response
+                System.out.println("No client socket for response: " + response);
+                return;
+            }
+    
+            // Send the response back to the client
+            ObjectOutputStream clientOutputStream = new ObjectOutputStream(clientSocket.getOutputStream());
+            clientOutputStream.writeObject(response);
+            clientOutputStream.flush();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private static void initTLSClientSocket(ModuleName module) {
         SSLSocket socket = null;
         try {
             String[] hostAndPort = getHostAndPort(module);
-
+    
             //KeyStore
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
-
+    
             //TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-            Enumeration<String> aliases = trustStore.aliases();
-
-//            while (aliases.hasMoreElements()) {
-//                String alias = aliases.nextElement();
-//                Certificate certificate = trustStore.getCertificate(alias);
-//                System.out.println("Alias: " + alias);
-//                System.out.println("Certificate: " + certificate.toString());
-//            }
-
+    
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
-
+    
             // Set up the SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
-
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
-
-            System.out.println(hostAndPort[0]);
-            System.out.println(hostAndPort[1]);
-
+    
+            // Set up the socket to use TLSv1.2
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
-
             socket.setEnabledProtocols(CONFPROTOCOLS);
             socket.setEnabledCipherSuites(CONFCIPHERSUITES);
-
+    
             // Start the handshake
             socket.startHandshake();
-
-            SSLSession session = socket.getSession();
-
-            System.out.println();
-            System.out.println("Hum from my offer server decided to select\n");
-            System.out.println("TLS protocol version: " + session.getProtocol());
-            System.out.println("Ciphersuite: " + session.getCipherSuite());
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (KeyManagementException e) {
-            e.printStackTrace();
-        } catch (UnrecoverableKeyException e) {
+    
+            // Add the socket to the map
+            socketMap.put(module, socket);
+            
+            ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
+            Wrapper message;
+            while ((message = (Wrapper) objectInputStream.readObject()) != null) {
+                Wrapper threadSafeMessage = message;
+                new Thread(() -> {
+                    handleRequest(threadSafeMessage);
+                }).start();
+            }
+    
+        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException | UnrecoverableKeyException | ClassNotFoundException e) {
             e.printStackTrace();
         }
-        return socket;
     }
-
-
 
 }

@@ -56,7 +56,6 @@ public class Main {
                 e.printStackTrace();
             }
         }
-        
     }
 
     private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket,Authentication authentication){
@@ -130,7 +129,6 @@ public class Main {
                 try {
                     objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(generatedkey, responseBytes)));
                 } catch (InvalidAlgorithmParameterException | CryptoException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
                 
