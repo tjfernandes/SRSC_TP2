@@ -58,7 +58,7 @@ public class Main {
         }
     }
 
-    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket,Authentication authentication){
+    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, Authentication authentication) {
        try {
 
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
@@ -66,7 +66,6 @@ public class Main {
 
             Wrapper wrapper;
             while ((wrapper = (Wrapper) objectInputStream.readObject()) != null) {
-                ResponseMessage response = null;
                 RequestMessage requestMessage = null;
                 byte messageType = wrapper.getMessageType();
                 byte[] serializedMessage = wrapper.getMessage();
@@ -75,7 +74,6 @@ public class Main {
                     ObjectInputStream inputStream = new ObjectInputStream(byteArrayInputStream)) {
                     requestMessage = (RequestMessage) inputStream.readObject();
                 } catch (IOException | ClassNotFoundException e) {
-                    // Handle any exceptions that occur during deserialization
                     e.printStackTrace();
                 }
                 
@@ -85,19 +83,15 @@ public class Main {
                 SecretKey generatedkey = kg.generateKey();
                 
                 TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,requestMessage.getServiceId(), generatedkey);
-                
-                
+                byte[] tgtBytes = null;
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                ObjectOutputStream out = null;
+                ObjectOutputStream outStream = null;
                 try {
-                    out = new ObjectOutputStream(bos);   
-                    out.writeObject(tgt);
-                    out.flush();
-                    byte[] tgtBytes = bos.toByteArray();
-
-                    response = new ResponseMessage(generatedkey,tgtBytes);
-
-                } catch (IOException e ) {
+                    outStream = new ObjectOutputStream(bos);
+                    outStream.writeObject(tgt);
+                    outStream.flush();
+                    tgtBytes = bos.toByteArray();
+                } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
                     try {
@@ -107,16 +101,26 @@ public class Main {
                     }
                 }
 
+                String key = authentication.getUsernamePassword(requestMessage.getClientId());
+                SecretKey secretKey = CryptoStuff.getInstance().convertStringToSecretKeyto(key);
+
+                byte[] encryptedTGT = null;
+                try {
+                    encryptedTGT = CryptoStuff.getInstance().encrypt(secretKey, tgtBytes);
+                } catch (InvalidAlgorithmParameterException | CryptoException e) {
+                    e.printStackTrace();
+                }
+
+                ResponseMessage response = new ResponseMessage(generatedkey, encryptedTGT);
+
                 byte[] responseBytes = null;
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ObjectOutputStream outStream = null;
                 try {
-                    outStream = new ObjectOutputStream(baos);   
+                    outStream = new ObjectOutputStream(baos);
                     outStream.writeObject(response);
                     outStream.flush();
-                    responseBytes = bos.toByteArray();
-                    
-                } catch (IOException e ) {
+                    responseBytes = baos.toByteArray();
+                } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
                     try {
@@ -131,18 +135,12 @@ public class Main {
                 } catch (InvalidAlgorithmParameterException | CryptoException e) {
                     e.printStackTrace();
                 }
-                
+
                 objectOutputStream.flush();
             }
 
-            objectOutputStream.close();
-            objectInputStream.close();
-            requestSocket.close();
-
-        } catch (IOException | ClassNotFoundException e) {
+        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException e) {
             e.printStackTrace();
-        } catch (NoSuchAlgorithmException e1) {
-            e1.printStackTrace();
         }
     }
 

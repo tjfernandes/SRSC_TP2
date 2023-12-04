@@ -1,18 +1,14 @@
 package org.example.crypto;
 
-import java.security.Key;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.GCMParameterSpec;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
-
-import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 public class CryptoStuff {
 
@@ -57,11 +53,5 @@ public class CryptoStuff {
         } catch ( BadPaddingException | IllegalBlockSizeException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException ex) {
             throw new CryptoException("Error encrypting/decrypting data" + ex.getMessage());
         }
-    }
-
-    public SecretKey convertStringToSecretKeyto(String encodedKey) {
-        byte[] decodedKey = Base64.getDecoder().decode(encodedKey);
-        SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
-        return originalKey;
     }
 }
