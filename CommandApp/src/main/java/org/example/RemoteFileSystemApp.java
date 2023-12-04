@@ -15,6 +15,7 @@ import java.io.*;
 import java.security.KeyStore;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public class RemoteFileSystemApp {
 
@@ -117,7 +118,7 @@ public class RemoteFileSystemApp {
             byte[] requestMessageSerialized = getRequestMessageSerialized(messageType);
 
             // Create wrapper object with serialized request message for auth and its type
-            Wrapper authWrapper = new Wrapper(messageType, requestMessageSerialized);
+            Wrapper authWrapper = new Wrapper(messageType, requestMessageSerialized, UUID.randomUUID());
 
             // Send wrapper to dispatcher
             oos.writeObject(authWrapper);

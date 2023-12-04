@@ -10,6 +10,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.UUID;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -68,6 +69,7 @@ public class Main {
             while ((wrapper = (Wrapper) objectInputStream.readObject()) != null) {
                 RequestMessage requestMessage = null;
                 byte messageType = wrapper.getMessageType();
+                UUID uuid = wrapper.getMessageId();
                 byte[] serializedMessage = wrapper.getMessage();
 
                 try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(serializedMessage);
@@ -131,7 +133,7 @@ public class Main {
                 }
                 
                 try {
-                    objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(generatedkey, responseBytes)));
+                    objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(generatedkey, responseBytes),uuid));
                 } catch (InvalidAlgorithmParameterException | CryptoException e) {
                     e.printStackTrace();
                 }

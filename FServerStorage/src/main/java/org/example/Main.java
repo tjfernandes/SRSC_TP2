@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Properties;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -132,6 +133,7 @@ public class Main {
             Wrapper wrapper = (Wrapper) objectInputStream.readObject();
             RequestMessage requestMessage = null;
             byte messageType = wrapper.getMessageType();
+            UUID messageId = wrapper.getMessageId();
             byte[] serializedMessage = wrapper.getMessage();
             try (ObjectInputStream inputStream = new ObjectInputStream(new ByteArrayInputStream(serializedMessage))) {
                 requestMessage = (RequestMessage) inputStream.readObject();
@@ -149,7 +151,7 @@ public class Main {
             byte[] encryptedResponse = crypto.encrypt(key, baos.toByteArray());
 
             // Create a new Wrapper object with the byte array
-            Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse);
+            Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse,messageId);
 
             // Sending the ResponseMessage
             objectOutputStream.writeObject(responseWrapper);

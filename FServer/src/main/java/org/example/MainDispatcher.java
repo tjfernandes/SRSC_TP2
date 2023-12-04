@@ -14,6 +14,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class MainDispatcher {
 
@@ -48,7 +49,7 @@ public class MainDispatcher {
     // Create a map of ModuleName to SSLSocket
     static Map<ModuleName, SSLSocket> socketMap = new HashMap<>();
     // A map from request IDs to client sockets
-    private static Map<String, SSLSocket> clientSocketMap = new HashMap<>();
+    private static Map<UUID, SSLSocket> clientSocketMap = new HashMap<>();
 
     public static void main(String[] args) throws Exception {
 
@@ -95,6 +96,9 @@ public class MainDispatcher {
 
     private static void clientHandleRequest(Wrapper request, SSLSocket clientSocket) {
         try {
+            // Add the client socket to the map
+            clientSocketMap.put(request.getMessageId(), clientSocket);
+    
             // Choose the correct socket for this request
             SSLSocket targetSocket = chooseSocket(request);
             if (targetSocket == null) {
@@ -107,15 +111,6 @@ public class MainDispatcher {
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(targetSocket.getOutputStream());
             objectOutputStream.writeObject(request);
             objectOutputStream.flush();
-    
-            // Wait for the response
-            ObjectInputStream objectInputStream = new ObjectInputStream(targetSocket.getInputStream());
-            Wrapper response = (Wrapper) objectInputStream.readObject();
-    
-            // Send the response back to the client
-            ObjectOutputStream clientOutputStream = new ObjectOutputStream(clientSocket.getOutputStream());
-            clientOutputStream.writeObject(response);
-            clientOutputStream.flush();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -137,10 +132,10 @@ public class MainDispatcher {
         }
     }
 
-    private static void handleRequest(Wrapper response) {
+    private static void handleResponse(Wrapper response) {
         try {
             // Get the client socket for this response
-            SSLSocket clientSocket = clientSocketMap.get(response.getRequestId());
+            SSLSocket clientSocket = clientSocketMap.get(response.getMessageId());
             if (clientSocket == null) {
                 // Handle the case where there's no client socket for this response
                 System.out.println("No client socket for response: " + response);
@@ -195,7 +190,7 @@ public class MainDispatcher {
             while ((message = (Wrapper) objectInputStream.readObject()) != null) {
                 Wrapper threadSafeMessage = message;
                 new Thread(() -> {
-                    handleRequest(threadSafeMessage);
+                    handleResponse(threadSafeMessage);
                 }).start();
             }
     
