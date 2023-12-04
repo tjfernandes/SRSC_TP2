@@ -13,11 +13,14 @@ import javax.net.ssl.*;
 
 import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
+import org.example.utils.Authenticator;
 import org.example.utils.Command;
 import org.example.utils.CommandReturn;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
 import org.example.utils.ServiceGrantingTicket;
+
+import com.dropbox.core.android.Auth;
 
 public class Main {
 
@@ -41,6 +44,7 @@ public class Main {
         FsManager fsManager = new FsManager();
         CryptoStuff crypto = CryptoStuff.getInstance();
 
+        // loading the key from the properties file
         Properties props = new Properties();
         try (FileInputStream input = new FileInputStream(STORAGE_TGS_KEY_PATH)) {
             props.load(input);
@@ -120,11 +124,14 @@ public class Main {
 
     private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, FsManager fsManager, CryptoStuff crypto, SecretKey key) {
         try {
+            // Creating the streams
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
     
+            // Reading the RequestMessage
             RequestMessage requestMessage;
             while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
+                // Processing the RequestMessage
                 ResponseMessage response = processRequest(requestMessage, fsManager, crypto, key);
                 objectOutputStream.writeObject(response);
                 objectOutputStream.flush();
@@ -140,12 +147,25 @@ public class Main {
     }
     
     private static ResponseMessage processRequest(RequestMessage requestMessage, FsManager fsManager, CryptoStuff crypto, SecretKey key) throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
+        
+        // Decrypting the Authenticator
+        byte[] encryptedAuth = requestMessage.getAuthenticator();
+        byte[] authBytes = crypto.decrypt(key, encryptedAuth);
+        ByteArrayInputStream bis = new ByteArrayInputStream(authBytes);
+        ObjectInputStream ois = new ObjectInputStream(bis);
+        Authenticator authenticator = (Authenticator) ois.readObject();
+    
+        // Checking if the Authenticator is valid
+        //missing
+
+        // Decrypting the Service Granting Ticket
         byte[] encryptedsgt = requestMessage.getEncryptedSgt();
         byte[] sgtBytes = crypto.decrypt(key, encryptedsgt);
-        ByteArrayInputStream bis = new ByteArrayInputStream(sgtBytes);
-        ObjectInputStream ois = new ObjectInputStream(bis);
+        bis = new ByteArrayInputStream(sgtBytes);
+        ois = new ObjectInputStream(bis);
         ServiceGrantingTicket sgt = (ServiceGrantingTicket) ois.readObject();
-    
+
+        // Handling request
         Command command = requestMessage.getCommand();
         CommandReturn commandReturn;
         switch (command.getCommand()) {
