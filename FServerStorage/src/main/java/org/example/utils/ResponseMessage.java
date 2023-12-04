@@ -3,31 +3,19 @@ package org.example.utils;
 import java.time.LocalDateTime;
 
 public class ResponseMessage {
-    private final LocalDateTime issueTime;
-    private final byte[] payload;
-    private final int status;
+    private final LocalDateTime issueTimeReturn;
+    private final CommandReturn commandReturn;
 
-    public ResponseMessage(byte[] payload, int status) {
-        this.issueTime = LocalDateTime.now();
-        this.payload = payload;
-        this.status = status;
+    public ResponseMessage(CommandReturn commandReturn, LocalDateTime issueTimeReturn) {
+        this.issueTimeReturn = LocalDateTime.now();
+        this.commandReturn = commandReturn;
+    }
+    
+    public CommandReturn getcommandReturn() {
+        return commandReturn;
     }
 
-    public ResponseMessage(int status) {
-        this.issueTime = LocalDateTime.now();
-        this.payload = new byte[0];
-        this.status = status;
-    }
-
-    public byte[] getPayload() {
-        return payload;
-    }
-
-    public int getStatus() {
-        return status;
-    }
-
-    public LocalDateTime getIssueTime() {
-        return issueTime;
+    public LocalDateTime getissueTimeReturn() {
+        return issueTimeReturn;
     }
 }

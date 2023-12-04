@@ -1,12 +1,13 @@
 package org.example.utils;
 
 import java.io.Serial;
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
 import javax.crypto.SecretKey;
 
-public class ServiceGrantingTicket {
+public class ServiceGrantingTicket implements Serializable{
 
     @Serial
     private static final long serialVersionUID = 1L;

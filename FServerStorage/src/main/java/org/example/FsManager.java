@@ -1,6 +1,7 @@
 package org.example;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.InvalidAlgorithmParameterException;
@@ -30,35 +31,45 @@ public class FsManager {
     private static final String DROPBOXCONFIG_PATH = "/app/java/dropbox-config.properties";
 
     public FsManager() {
-    crypto = CryptoStuff.getInstance();
-    fs = new LocalFileSystemDriver(FILESYSTEM_CONFIG_PATH);
-    //dbx = new DropboxDriver(DROPBOXCONFIG_PATH);
-    try {
-        Files.createDirectories(Paths.get("/filesystem"));
+        crypto = CryptoStuff.getInstance();
+        fs = new LocalFileSystemDriver(FILESYSTEM_CONFIG_PATH);
+        //dbx = new DropboxDriver(DROPBOXCONFIG_PATH);
+        try {
+            Files.createDirectories(Paths.get("/filesystem"));
 
-        KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
-        kg.init(KEYSIZE);
-        this.key = kg.generateKey();
-    } catch (NoSuchAlgorithmException | IOException e) {
-        e.printStackTrace();
-    }
-}
-
-    public List<String> lsCommand(String path) {
-        return fs.listFolder(path);
+            KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
+            kg.init(KEYSIZE);
+            this.key = kg.generateKey();
+        } catch (NoSuchAlgorithmException | IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    public void putCommand(String path, byte[] content) {
+    public byte[] lsCommand(String path) {
+        List<String> fileList = fs.listFolder(path); 
+        if(fileList == null) {
+            return null;
+        }
+        String fileListString = String.join("\n", fileList);
+        return fileListString.getBytes(StandardCharsets.UTF_8);
+    }
+
+    public boolean putCommand(String path, byte[] content) {
         byte[] encryptedContent;
     
         try {
             encryptedContent = crypto.encrypt(key, content);
         } catch (CryptoException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
-            return;
+            return false;
         }
     
-        fs.uploadFile(encryptedContent, path);
+        boolean ok = fs.uploadFile(encryptedContent, path);
+
+        if (!ok) {
+            return false;
+        }
+        return true;
     }
 
     public byte[] getCommand(String path) {
@@ -66,6 +77,10 @@ public class FsManager {
     
         encryptedContent = fs.downloadFile(path);
     
+        if (encryptedContent == null) {
+            return null;
+        }
+
         byte[] decryptedContent;
     
         try {
@@ -78,15 +93,30 @@ public class FsManager {
         return decryptedContent;
     }
 
-    public void mkdirCommand(String path) {
-        fs.createFolder(path);
+    public boolean mkdirCommand(String path) {
+        boolean ok = fs.createFolder(path);
+        if (ok) {
+            return true;
+        } 
+        return false;
     }
 
-    public void rmCommand(String path) {
-        fs.deleteFile(path);
+    public boolean rmCommand(String path) {
+        boolean ok = fs.deleteFile(path);
+
+        if (!ok) {
+            return false;
+        }
+
+        return true;
     }
 
-    public void cpCommand(String sourcePath, String destinationPath) {
-        fs.copyFile(sourcePath, destinationPath);
+    public boolean cpCommand(String sourcePath, String destinationPath) {
+        boolean ok = fs.copyFile(sourcePath, destinationPath);
+
+        if (!ok) {
+            return false;
+        }
+        return true;
     }
 }

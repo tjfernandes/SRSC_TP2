@@ -29,7 +29,7 @@ public class LocalFileSystemDriver {
         return properties;
     }
 
-    public void uploadFile(byte[] fileContent, String targetFilePath) {
+    public boolean uploadFile(byte[] fileContent, String targetFilePath) {
     try {
         Path path = Paths.get(basePath + targetFilePath);
         Files.createDirectories(path.getParent());
@@ -41,29 +41,30 @@ public class LocalFileSystemDriver {
             while ((bytesRead = in.read(buffer)) != -1) {
                 out.write(buffer, 0, bytesRead);
             }
-            System.out.println("File uploaded: " + targetFilePath);
         } catch (IOException e) {
-            e.printStackTrace();
+            return false;
         }
     } catch (IOException e) {
-        System.out.println("Error creating directories: " + e.getMessage());
+        return false;
     }
+    return true;
 }
 
 
-    public void createFolder(String path) {
+    public boolean createFolder(String path) {
         Path folderPath = Path.of(basePath + path);
         try {
             Files.createDirectories(folderPath);
             System.out.println("Folder created: " + folderPath.toString());
         } catch (IOException e) {
-            e.printStackTrace();
+          return false;
         }
+        return true;
     }
 
     public byte[] downloadFile(String filePath) {
-        Path sourcePath = Path.of(basePath + filePath);
         try {
+            Path sourcePath = Path.of(basePath + filePath);
             return Files.readAllBytes(sourcePath);
         } catch (IOException e) {
             e.printStackTrace();
@@ -85,29 +86,31 @@ public class LocalFileSystemDriver {
             });
             return fileList;
         } catch (IOException e) {
-            e.printStackTrace();
+            return null;
         }
-        return null;
     }
 
-    public void copyFile(String fromPath, String toPath) {
-        Path sourcePath = Path.of(basePath + fromPath);
-        Path targetPath = Path.of(basePath + toPath);
+    public boolean copyFile(String fromPath, String toPath) {
+        
         try {
+            Path sourcePath = Path.of(basePath + fromPath);
+            Path targetPath = Path.of(basePath + toPath);
             Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
             System.out.println("File copied to: " + targetPath.toString());
         } catch (IOException e) {
-            e.printStackTrace();
+            return false;
         }
+
+        return true;
     }
 
-    public void deleteFile(String path) {
-        Path filePath = Path.of(basePath + path);
+    public boolean deleteFile(String path) {
         try {
+            Path filePath = Path.of(basePath + path);
             Files.deleteIfExists(filePath);
-            System.out.println("File deleted: " + filePath.toString());
         } catch (IOException e) {
-            e.printStackTrace();
+            return false;
         }
+        return true;
     }
 }
