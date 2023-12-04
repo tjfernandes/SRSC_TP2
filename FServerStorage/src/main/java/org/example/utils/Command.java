@@ -43,4 +43,8 @@ public class Command {
     public String getPath() {
         return path;
     }
+
+    public boolean isValid() {
+        return !(path.contains("../") || (cpToPath != null && cpToPath.contains("../")));
+    }
 }

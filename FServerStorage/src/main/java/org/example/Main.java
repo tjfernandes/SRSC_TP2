@@ -4,6 +4,7 @@ import java.io.*;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Properties;
 
@@ -19,8 +20,6 @@ import org.example.utils.CommandReturn;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
 import org.example.utils.ServiceGrantingTicket;
-
-import com.dropbox.core.android.Auth;
 
 public class Main {
 
@@ -137,6 +136,7 @@ public class Main {
                 objectOutputStream.flush();
             }
     
+            // Closing the streams
             objectOutputStream.close();
             objectInputStream.close();
             requestSocket.close();
@@ -148,26 +148,36 @@ public class Main {
     
     private static ResponseMessage processRequest(RequestMessage requestMessage, FsManager fsManager, CryptoStuff crypto, SecretKey key) throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
         
-        // Decrypting the Authenticator
-        byte[] encryptedAuth = requestMessage.getAuthenticator();
-        byte[] authBytes = crypto.decrypt(key, encryptedAuth);
-        ByteArrayInputStream bis = new ByteArrayInputStream(authBytes);
-        ObjectInputStream ois = new ObjectInputStream(bis);
-        Authenticator authenticator = (Authenticator) ois.readObject();
-    
-        // Checking if the Authenticator is valid
-        //missing
-
         // Decrypting the Service Granting Ticket
         byte[] encryptedsgt = requestMessage.getEncryptedSgt();
         byte[] sgtBytes = crypto.decrypt(key, encryptedsgt);
-        bis = new ByteArrayInputStream(sgtBytes);
-        ois = new ObjectInputStream(bis);
+        ByteArrayInputStream bis = new ByteArrayInputStream(sgtBytes);
+        ObjectInputStream ois = new ObjectInputStream(bis);
         ServiceGrantingTicket sgt = (ServiceGrantingTicket) ois.readObject();
 
-        // Handling request
+        // Decrypting the Authenticator
+        byte[] encryptedAuth = requestMessage.getAuthenticator();
+        byte[] authBytes = crypto.decrypt(key, encryptedAuth);
+        bis = new ByteArrayInputStream(authBytes);
+        ois = new ObjectInputStream(bis);
+        Authenticator authenticator = (Authenticator) ois.readObject();
+
+        LocalDateTime returnTime = authenticator.getTimestamp().plusHours(1);
+
+        // Checking if the Authenticator is valid
+        if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
+            return new ResponseMessage(new CommandReturn(requestMessage.getCommand().getCommand(), 403), returnTime);
+        }
+        
         Command command = requestMessage.getCommand();
+
+        // Checking if the command is valid
+        if (!command.isValid()) {
+            return new ResponseMessage(new CommandReturn(requestMessage.getCommand().getCommand(), 403), returnTime);
+        }
+
         CommandReturn commandReturn;
+        // Handling request and get the response
         switch (command.getCommand()) {
             case "GET":
                 commandReturn = processGetCommand(command, fsManager);
@@ -191,7 +201,8 @@ public class Main {
                 commandReturn = new CommandReturn(command.getCommand(), 400);
                 break;
         }
-        return new ResponseMessage(commandReturn, sgt.getIssueTime().plusHours(1));
+
+        return new ResponseMessage(commandReturn,returnTime);
     }
 
     private static SSLServerSocket server() {

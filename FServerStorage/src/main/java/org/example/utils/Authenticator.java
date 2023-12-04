@@ -24,4 +24,8 @@ public class Authenticator {
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
+
+    public boolean isValid(String userId, String userAddress) {
+        return this.userId.equals(userId) && this.userAddress.equals(userAddress);
+    }
 }
