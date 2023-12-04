@@ -28,10 +28,3 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
-
-  fserver-commandapp-service:
-    build:
-      context: ./CommandApp
-      dockerfile: Dockerfile
-    ports:
-      - "8084:8084"

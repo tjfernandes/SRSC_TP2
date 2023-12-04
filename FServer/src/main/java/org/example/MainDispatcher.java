@@ -1,6 +1,9 @@
 package org.example;
 
 import com.sun.net.httpserver.*;
+import org.example.utils.RequestMessage;
+import org.example.utils.ResponseMessage;
+
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.URLEncoder;
@@ -11,10 +14,8 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.util.Enumeration;
-import java.util.Map;
 
 public class MainDispatcher {
 
@@ -36,38 +37,39 @@ public class MainDispatcher {
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
             case STORAGE:
-                return new String[]{"172.17.0.1", "8083"};
+                return new String[]{"localhost", "8083"};
             case AUTHENTICATION:
-                return new String[]{"172.17.0.1", "8081"};
+                return new String[]{"localhost", "8081"};
             case ACCESS_CONTROL:
-                return new String[]{"172.17.0.1", "8082"};
+                return new String[]{"localhost", "8082"};
             default:
                 throw new IllegalArgumentException("Invalid module name");
         }
     }
 
     public static void main(String[] args) throws Exception {
-        //initTLSServerSocket();
+        System.setProperty("javax.net.debug", "ssl");
+        initTLSServerSocket();
 
 
-        boolean runStorage = true;
-        boolean runAuthentication = true;
-        while(runStorage) {
-            try {
-                sendMessage(ModuleName.STORAGE);
-                runStorage = false;
-            } catch (Exception e) {
-                System.out.println("Failed to connect to storage server");
-            }
-        }
-        while(runAuthentication) {
-            try {
-                sendMessage(ModuleName.AUTHENTICATION);
-                runAuthentication = false;
-            } catch (Exception e) {
-                System.out.println("Failed to connect to auth server");
-            }
-        }
+//        boolean runStorage = true;
+//        boolean runAuthentication = true;
+//        while(runStorage) {
+//            try {
+//                sendMessage(ModuleName.STORAGE);
+//                runStorage = false;
+//            } catch (Exception e) {
+//                System.out.println("Failed to connect to storage server");
+//            }
+//        }
+//        while(runAuthentication) {
+//            try {
+//                sendMessage(ModuleName.AUTHENTICATION);
+//                runAuthentication = false;
+//            } catch (Exception e) {
+//                System.out.println("Failed to connect to auth server");
+//            }
+//        }
     }
 
     private static void initTLSServerSocket() {
@@ -75,26 +77,30 @@ public class MainDispatcher {
             //Keystore
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
-
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
+
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
 
             // SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
-            sslContext.init(kmf.getKeyManagers(), null, new SecureRandom());
-
+            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-
+            serverSocket.setUseClientMode(true);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
             serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+
+            System.out.println("Supported Ciphersuites: " + String.join(", ", serverSocket.getEnabledCipherSuites()));
 
             System.out.println("Server is listening on port 8080...");
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                System.out.println("ENTROU");
                 Thread clientThread = new Thread(() -> handleRequest(clientSocket));
                 clientThread.start();
             }
@@ -111,9 +117,8 @@ public class MainDispatcher {
             BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
 
-            String command = reader.readLine();
-
-            if (command != null) {
+            String command;
+            while((command = reader.readLine()) != null) {
                 System.out.println("Received command: " + command);
 
                 writer.write(command);
@@ -155,7 +160,7 @@ public class MainDispatcher {
 //                        file = fullCommand[1];
 //                    default: break;
 //                }
-            } else System.out.println("CONA");
+            }
 
             writer.close();
             reader.close();
@@ -225,7 +230,7 @@ public class MainDispatcher {
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
 
             socket.setEnabledProtocols(CONFPROTOCOLS);
-            //socket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            socket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
             // Start the handshake
             socket.startHandshake();
