@@ -13,6 +13,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Enumeration;
 import java.util.Properties;
+import java.util.UUID;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -26,10 +27,12 @@ import javax.net.ssl.TrustManagerFactory;
 
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
+import org.example.utils.Authenticator;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
 import org.example.utils.ServiceGrantingTicket;
 import org.example.utils.TicketGrantingTicket;
+import org.example.utils.Wrapper;
 
 import java.security.cert.Certificate;
 import java.time.LocalDateTime;
@@ -130,24 +133,33 @@ public class Main {
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
 
-            RequestMessage requestMessage;
+            Wrapper wrapper;
 
-            while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
-                System.out.println("Received message: " + requestMessage);
+            while ((wrapper = (Wrapper) objectInputStream.readObject()) != null) {
+                System.out.println("Received message: " + wrapper);
+
+                // deserialize request message
+                RequestMessage requestMessage = (RequestMessage) deserializeObject(wrapper.getMessage());
+                
 
                 String serviceId = requestMessage.getServiceId();
                 byte[] ticketGT = requestMessage.getTgt();
-                byte[] authenticator = requestMessage.getAuthenticator();
+                byte[] authenticatorSerialized = requestMessage.getAuthenticator();
 
-                // decrypt TGT
-                CryptoStuff cryptoStuff = CryptoStuff.getInstance();
-                ticketGT = cryptoStuff.decrypt(tgsKey, ticketGT);
+                // deserialize authenticator
+                Authenticator authenticator = (Authenticator) deserializeObject(authenticatorSerialized);
 
-                // deserialize TGT
-                ByteArrayInputStream bis = new ByteArrayInputStream(ticketGT);
-                ObjectInputStream ois = new ObjectInputStream(bis);
-                TicketGrantingTicket tgt = (TicketGrantingTicket) ois.readObject();
+
+                // decrypt and deserialize TGT
+                ticketGT = CryptoStuff.decrypt(tgsKey, ticketGT);
+                TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(ticketGT);
                 SecretKey sessionKey = convertStringToSecretKeyto(tgt.getKey());
+
+                // check if authenticator is valid
+                if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
+                    System.out.println("Authenticator is not valid");
+                    return;
+                }
 
                 // generate key for ticket
                 KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
@@ -155,26 +167,23 @@ public class Main {
                 SecretKey generatedkey = kg.generateKey();
 
                 // create ticket
-                ServiceGrantingTicket t = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(),
-                        serviceId, generatedkey);
+                ServiceGrantingTicket t = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId, generatedkey);
                 LocalDateTime issueTime = t.getIssueTime();
 
                 // serialize the ticket and encrypt it
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                ObjectOutputStream oos = new ObjectOutputStream(bos);
-                oos.writeObject(t);
-                byte[] sgt = bos.toByteArray();
+                byte[] sgt = serializeObject(t); 
                 sgt = CryptoStuff.encrypt(storageKey, sgt);
 
                 // serialize and encrypt message
-                bos = new ByteArrayOutputStream();
-                oos = new ObjectOutputStream(bos);
-                oos.writeObject(new ResponseMessage(generatedkey, serviceId, issueTime, sgt));
-                byte[] responseMessage = bos.toByteArray();
-                responseMessage = CryptoStuff.encrypt(sessionKey, responseMessage);
+                byte[] payloadSerialized = serializeObject(new ResponseMessage(sessionKey, serviceId, issueTime, sgt));
+                payloadSerialized = CryptoStuff.encrypt(sessionKey, payloadSerialized);
 
-                // send message
-                objectOutputStream.writeObject(responseMessage);
+                // create wrapper message
+                UUID id = UUID.randomUUID();
+                Wrapper wrapperMessage = new Wrapper((byte) 4, payloadSerialized, id);
+
+                // send wrapper message
+                objectOutputStream.writeObject(wrapperMessage);
                 objectOutputStream.flush();
 
                 // closing streams/sockets
@@ -189,40 +198,37 @@ public class Main {
         }
     }
 
-    public static SecretKey convertStringToSecretKeyto(String encodedKey) {
+    private static SecretKey convertStringToSecretKeyto(String encodedKey) {
         byte[] decodedKey = Base64.getDecoder().decode(encodedKey);
         SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
         return originalKey;
     }
 
-    /*
-     * private static void handleRequest1(SSLSocket clientSocket, SSLServerSocket
-     * serverSocket) {
-     * try {
-     * // Communication logic with the client
-     * BufferedReader reader = new BufferedReader(new
-     * InputStreamReader(clientSocket.getInputStream()));
-     * BufferedWriter writer = new BufferedWriter(new
-     * OutputStreamWriter(clientSocket.getOutputStream()));
-     * 
-     * String message;
-     * while ((message = reader.readLine()) != null) {
-     * System.out.println("Received message: " + message);
-     * 
-     * // Example response
-     * writer.write("Server received your message: " + message);
-     * writer.newLine();
-     * writer.flush();
-     * }
-     * 
-     * writer.close();
-     * reader.close();
-     * clientSocket.close();
-     * serverSocket.close();
-     * } catch (IOException e) {
-     * e.printStackTrace();
-     * }
-     * }
-     */
+
+    private static byte[] serializeObject(Object object) {
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ObjectOutputStream oos = new ObjectOutputStream(bos);
+            oos.writeObject(object);
+            byte[] serializedObject = bos.toByteArray();
+            return serializedObject;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private static Object deserializeObject(byte[] serializedObject) {
+        try {
+            ByteArrayInputStream bis = new ByteArrayInputStream(serializedObject);
+            ObjectInputStream ois = new ObjectInputStream(bis);
+            Object object = ois.readObject();
+            return object;
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 
 }
