@@ -3,18 +3,18 @@ package org.example.utils;
 public class Wrapper {
 
     private final byte messageType;
-    private final Object object;
+    private final byte[] message;
     
-    public Wrapper(byte messageType, Object object) {
+    public Wrapper(byte messageType, byte[] message) {
         this.messageType = messageType;
-        this.object = object;
+        this.message = message;
     }
 
     public byte getMessageType() {
         return messageType;
     }
 
-    public Object getObject() {
-        return object;
+    public byte[] getMessage() {
+        return message;
     }
 }

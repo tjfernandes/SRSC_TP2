@@ -1,10 +1,12 @@
 package org.example;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -18,6 +20,8 @@ import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
 
+import org.example.crypto.CryptoException;
+import org.example.crypto.CryptoStuff;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
 import org.example.utils.TicketGrantingTicket;
@@ -64,14 +68,25 @@ public class Main {
             Wrapper wrapper;
             while ((wrapper = (Wrapper) objectInputStream.readObject()) != null) {
                 ResponseMessage response = null;
-                RequestMessage requestMessage = (RequestMessage) wrapper.getObject();
+                RequestMessage requestMessage = null;
                 byte messageType = wrapper.getMessageType();
+                byte[] serializedMessage = wrapper.getMessage();
+
+                try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(serializedMessage);
+                    ObjectInputStream inputStream = new ObjectInputStream(byteArrayInputStream)) {
+                    requestMessage = (RequestMessage) inputStream.readObject();
+                } catch (IOException | ClassNotFoundException e) {
+                    // Handle any exceptions that occur during deserialization
+                    e.printStackTrace();
+                }
+                
                 KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
                 kg.init(KEYSIZE);
 
                 SecretKey generatedkey = kg.generateKey();
                 
                 TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,requestMessage.getServiceId(), generatedkey);
+                
                 
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 ObjectOutputStream out = null;
@@ -82,6 +97,7 @@ public class Main {
                     byte[] tgtBytes = bos.toByteArray();
 
                     response = new ResponseMessage(generatedkey,tgtBytes);
+
                 } catch (IOException e ) {
                     e.printStackTrace();
                 } finally {
@@ -91,8 +107,33 @@ public class Main {
                         ex.printStackTrace();
                     }
                 }
+
+                byte[] responseBytes = null;
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ObjectOutputStream outStream = null;
+                try {
+                    outStream = new ObjectOutputStream(baos);   
+                    outStream.writeObject(response);
+                    outStream.flush();
+                    responseBytes = bos.toByteArray();
+                    
+                } catch (IOException e ) {
+                    e.printStackTrace();
+                } finally {
+                    try {
+                        baos.close();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
                 
-                objectOutputStream.writeObject(new Wrapper(messageType, response));
+                try {
+                    objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(generatedkey, responseBytes)));
+                } catch (InvalidAlgorithmParameterException | CryptoException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                
                 objectOutputStream.flush();
             }
 
