@@ -15,7 +15,7 @@ import java.util.Enumeration;
 
 public class RemoteFileSystemApp {
 
-    public static final String[] CONFPROTOCOLS     = {"TLSv1.2"};;
+    public static final String[] CONFPROTOCOLS     = {"TLSv1.2"};
     public static final String[] CONFCIPHERSUITES  = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
     public static final String KEYSTORE_TYPE       = "JKS";
     public static final String KEYSTORE_PASSWORD   = "client_password";
@@ -28,6 +28,13 @@ public class RemoteFileSystemApp {
     public static final int DISPATCHER_PORT        = 8080;
 
     public static void main(String[] args) throws IOException {
+        System.setProperty("javax.net.debug", "ssl");
+        try {
+            // Sleep for 1 second (1000 milliseconds)
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         String response = requestCommand("login username password");
         System.out.println(response);
     }
@@ -61,7 +68,6 @@ public class RemoteFileSystemApp {
 
             KeyStore keyStore = KeyStore.getInstance("JKS");
             keyStore.load(RemoteFileSystemApp.class.getResourceAsStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
-
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(keyStore, KEYSTORE_PASSWORD.toCharArray());
 
@@ -69,12 +75,12 @@ public class RemoteFileSystemApp {
             trustStore.load(RemoteFileSystemApp.class.getResourceAsStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD);
             Enumeration<String> aliases = trustStore.aliases();
 
-//            while (aliases.hasMoreElements()) {
-//                String alias = aliases.nextElement();
-//                Certificate certificate = trustStore.getCertificate(alias);
-//                System.out.println("Alias: " + alias);
-//                System.out.println("Certificate: " + certificate.toString());
-//            }
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                Certificate certificate = trustStore.getCertificate(alias);
+                System.out.println("Alias: " + alias);
+                System.out.println("Certificate: " + certificate.toString());
+            }
 
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
@@ -88,11 +94,11 @@ public class RemoteFileSystemApp {
             System.out.println("HOST: " + DISPATCHER_HOST);
             System.out.println("PORT: " + DISPATCHER_PORT);
 
-            socket = (SSLSocket) sslSocketFactory.createSocket(DISPATCHER_HOST, 8080);
-
-
+            socket = (SSLSocket) sslSocketFactory.createSocket(DISPATCHER_HOST, DISPATCHER_PORT);
             socket.setEnabledProtocols(CONFPROTOCOLS);
             socket.setEnabledCipherSuites(CONFCIPHERSUITES);
+
+            System.out.println("Supported Ciphersuites: " + String.join(", ", socket.getEnabledCipherSuites()));
 
             socket.startHandshake();
 

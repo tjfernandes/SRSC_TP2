@@ -14,10 +14,8 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.util.Enumeration;
-import java.util.Map;
 
 public class MainDispatcher {
 
@@ -39,17 +37,18 @@ public class MainDispatcher {
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
             case STORAGE:
-                return new String[]{"172.17.0.1", "8083"};
+                return new String[]{"localhost", "8083"};
             case AUTHENTICATION:
-                return new String[]{"172.17.0.1", "8081"};
+                return new String[]{"localhost", "8081"};
             case ACCESS_CONTROL:
-                return new String[]{"172.17.0.1", "8082"};
+                return new String[]{"localhost", "8082"};
             default:
                 throw new IllegalArgumentException("Invalid module name");
         }
     }
 
     public static void main(String[] args) throws Exception {
+        System.setProperty("javax.net.debug", "ssl");
         initTLSServerSocket();
 
 
@@ -78,23 +77,30 @@ public class MainDispatcher {
             //Keystore
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
-
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
+
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
+
             // SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
-            sslContext.init(kmf.getKeyManagers(), null, new SecureRandom());
+            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
+            serverSocket.setUseClientMode(true);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
             serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+
+            System.out.println("Supported Ciphersuites: " + String.join(", ", serverSocket.getEnabledCipherSuites()));
 
             System.out.println("Server is listening on port 8080...");
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                System.out.println("ENTROU");
                 Thread clientThread = new Thread(() -> handleRequest(clientSocket));
                 clientThread.start();
             }
