@@ -131,24 +131,14 @@ public class Main {
     
             // Reading the RequestMessage
             Wrapper wrapper = (Wrapper) objectInputStream.readObject();
-            RequestMessage requestMessage = null;
+            RequestMessage requestMessage = (RequestMessage) deserialize(wrapper.getMessage());
             byte messageType = wrapper.getMessageType();
             UUID messageId = wrapper.getMessageId();
-            byte[] serializedMessage = wrapper.getMessage();
-            try (ObjectInputStream inputStream = new ObjectInputStream(new ByteArrayInputStream(serializedMessage))) {
-                requestMessage = (RequestMessage) inputStream.readObject();
-            }
 
             // Processing the RequestMessage
             ResponseMessage response = processRequest(requestMessage, fsManager, crypto, key);
-
-            // Convert the ResponseMessage object to a byte array
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            try (ObjectOutputStream objOutStream = new ObjectOutputStream(baos)) {
-                objOutStream.writeObject(response);
-            }
             
-            byte[] encryptedResponse = crypto.encrypt(key, baos.toByteArray());
+            byte[] encryptedResponse = crypto.encrypt(key, serialize(response));
 
             // Create a new Wrapper object with the byte array
             Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse,messageId);
@@ -172,16 +162,12 @@ public class Main {
         // Decrypting the Service Granting Ticket
         byte[] encryptedsgt = requestMessage.getEncryptedSgt();
         byte[] sgtBytes = crypto.decrypt(key, encryptedsgt);
-        ByteArrayInputStream bis = new ByteArrayInputStream(sgtBytes);
-        ObjectInputStream ois = new ObjectInputStream(bis);
-        ServiceGrantingTicket sgt = (ServiceGrantingTicket) ois.readObject();
+        ServiceGrantingTicket sgt = (ServiceGrantingTicket) deserialize(sgtBytes);
 
         // Decrypting the Authenticator
         byte[] encryptedAuth = requestMessage.getAuthenticator();
         byte[] authBytes = crypto.decrypt(key, encryptedAuth);
-        bis = new ByteArrayInputStream(authBytes);
-        ois = new ObjectInputStream(bis);
-        Authenticator authenticator = (Authenticator) ois.readObject();
+        Authenticator authenticator = (Authenticator) deserialize(authBytes);
 
         LocalDateTime returnTime = authenticator.getTimestamp().plusHours(1);
 
@@ -255,5 +241,21 @@ public class Main {
             e.printStackTrace();
         }
         return null;
+    }
+
+    private static byte[] serialize(Object object) throws IOException {
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
+            objectOutputStream.writeObject(object);
+            objectOutputStream.flush();
+            return byteArrayOutputStream.toByteArray();
+        }
+    }
+
+    private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
+        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+            ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
+            return objectInputStream.readObject();
+        }
     }
 }

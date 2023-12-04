@@ -10,6 +10,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Properties;
 import java.util.UUID;
 
 import javax.crypto.KeyGenerator;
@@ -43,15 +44,27 @@ public class Main {
     public static final String ALGORITHM            = "AES";
     public static final int KEYSIZE                 = 256;
 
+    public static final String TGS_KEY_PATH = "/app/crypto-config.properties";
+    public static final String TGS_KEY              = "TGS_AS_KEY";
+
 
     public static void main(String[] args) {
         Authentication authentication = new Authentication();
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
+
+        // Load the Properties file
+        Properties props = new Properties();
+        try (FileInputStream input = new FileInputStream(TGS_KEY_PATH)) {
+            props.load(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         while (true) {
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket, authentication));
+                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket, authentication, props));
                 clientThread.start();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -59,89 +72,42 @@ public class Main {
         }
     }
 
-    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, Authentication authentication) {
+    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, Authentication authentication, Properties props) {
        try {
-
+            // Create input and output streams for the socket
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
 
-            Wrapper wrapper;
-            while ((wrapper = (Wrapper) objectInputStream.readObject()) != null) {
-                RequestMessage requestMessage = null;
-                byte messageType = wrapper.getMessageType();
-                UUID uuid = wrapper.getMessageId();
-                byte[] serializedMessage = wrapper.getMessage();
+            // Read the message from the client
+            Wrapper wrapper = (Wrapper) objectInputStream.readObject();
+            RequestMessage requestMessage = (RequestMessage) deserialize(wrapper.getMessage());
+            byte messageType = wrapper.getMessageType();
+            UUID uuid = wrapper.getMessageId();
+            
+            // Generate a key for client/tgs communication
+            KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
+            kg.init(KEYSIZE);
+            SecretKey generatedkey = kg.generateKey();
+            
+            // Create a TGT
+            TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,requestMessage.getServiceId(), generatedkey);
+            byte[] tgtBytes = serialize(tgt);
 
-                try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(serializedMessage);
-                    ObjectInputStream inputStream = new ObjectInputStream(byteArrayInputStream)) {
-                    requestMessage = (RequestMessage) inputStream.readObject();
-                } catch (IOException | ClassNotFoundException e) {
-                    e.printStackTrace();
-                }
-                
-                KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
-                kg.init(KEYSIZE);
+            // Key to encrypt TGT
+            String keyTGT = props.getProperty(TGS_KEY);
+            SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKeyto(keyTGT);
 
-                SecretKey generatedkey = kg.generateKey();
-                
-                TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,requestMessage.getServiceId(), generatedkey);
-                byte[] tgtBytes = null;
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                ObjectOutputStream outStream = null;
-                try {
-                    outStream = new ObjectOutputStream(bos);
-                    outStream.writeObject(tgt);
-                    outStream.flush();
-                    tgtBytes = bos.toByteArray();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    try {
-                        bos.close();
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
+            // Key to encrypt response
+            String key = authentication.getUsernamePassword(requestMessage.getClientId());
+            SecretKey secretKey = CryptoStuff.getInstance().convertStringToSecretKeyto(key);
 
-                String key = authentication.getUsernamePassword(requestMessage.getClientId());
-                SecretKey secretKey = CryptoStuff.getInstance().convertStringToSecretKeyto(key);
+            // Encrypt TGT and send it to the client
+            byte[] encryptedTGT = CryptoStuff.getInstance().encrypt(secretKeyTGT, tgtBytes);
+            byte[] responseBytes = serialize(new ResponseMessage(generatedkey, encryptedTGT));
+            objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes),uuid));
+            objectOutputStream.flush();
 
-                byte[] encryptedTGT = null;
-                try {
-                    encryptedTGT = CryptoStuff.getInstance().encrypt(secretKey, tgtBytes);
-                } catch (InvalidAlgorithmParameterException | CryptoException e) {
-                    e.printStackTrace();
-                }
-
-                ResponseMessage response = new ResponseMessage(generatedkey, encryptedTGT);
-
-                byte[] responseBytes = null;
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                try {
-                    outStream = new ObjectOutputStream(baos);
-                    outStream.writeObject(response);
-                    outStream.flush();
-                    responseBytes = baos.toByteArray();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    try {
-                        baos.close();
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-                
-                try {
-                    objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(generatedkey, responseBytes),uuid));
-                } catch (InvalidAlgorithmParameterException | CryptoException e) {
-                    e.printStackTrace();
-                }
-
-                objectOutputStream.flush();
-            }
-
-        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException e) {
+        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | CryptoException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
     }
@@ -176,5 +142,21 @@ public class Main {
             e.printStackTrace();
         }
         return null;
+    }
+
+    private static byte[] serialize(Object object) throws IOException {
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
+            objectOutputStream.writeObject(object);
+            objectOutputStream.flush();
+            return byteArrayOutputStream.toByteArray();
+        }
+    }
+
+    private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
+        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+            ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
+            return objectInputStream.readObject();
+        }
     }
 }
