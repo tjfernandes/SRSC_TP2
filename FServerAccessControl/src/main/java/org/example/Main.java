@@ -151,6 +151,7 @@ public class Main {
 
 
                 // decrypt and deserialize TGT
+                CryptoStuff.getInstance();
                 ticketGT = CryptoStuff.decrypt(tgsKey, ticketGT);
                 TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(ticketGT);
                 SecretKey sessionKey = convertStringToSecretKeyto(tgt.getKey());
