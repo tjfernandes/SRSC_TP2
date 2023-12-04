@@ -20,6 +20,7 @@ import org.example.utils.CommandReturn;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
 import org.example.utils.ServiceGrantingTicket;
+import org.example.utils.Wrapper;
 
 public class Main {
 
@@ -128,18 +129,36 @@ public class Main {
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
     
             // Reading the RequestMessage
-            RequestMessage requestMessage;
-            while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
-                // Processing the RequestMessage
-                ResponseMessage response = processRequest(requestMessage, fsManager, crypto, key);
-                objectOutputStream.writeObject(response);
-                objectOutputStream.flush();
+            Wrapper wrapper = (Wrapper) objectInputStream.readObject();
+            RequestMessage requestMessage = null;
+            byte messageType = wrapper.getMessageType();
+            byte[] serializedMessage = wrapper.getMessage();
+            try (ObjectInputStream inputStream = new ObjectInputStream(new ByteArrayInputStream(serializedMessage))) {
+                requestMessage = (RequestMessage) inputStream.readObject();
             }
+
+            // Processing the RequestMessage
+            ResponseMessage response = processRequest(requestMessage, fsManager, crypto, key);
+
+            // Convert the ResponseMessage object to a byte array
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (ObjectOutputStream objOutStream = new ObjectOutputStream(baos)) {
+                objOutStream.writeObject(response);
+            }
+            
+            byte[] encryptedResponse = crypto.encrypt(key, baos.toByteArray());
+
+            // Create a new Wrapper object with the byte array
+            Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse);
+
+            // Sending the ResponseMessage
+            objectOutputStream.writeObject(responseWrapper);
+            objectOutputStream.flush();
     
-            // Closing the streams
-            objectOutputStream.close();
-            objectInputStream.close();
-            requestSocket.close();
+            // // Closing the streams
+            // objectOutputStream.close();
+            // objectInputStream.close();
+            // requestSocket.close();
     
         } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | CryptoException e) {
             e.printStackTrace();

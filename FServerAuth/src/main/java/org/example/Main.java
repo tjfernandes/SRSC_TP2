@@ -75,7 +75,6 @@ public class Main {
                     ObjectInputStream inputStream = new ObjectInputStream(byteArrayInputStream)) {
                     requestMessage = (RequestMessage) inputStream.readObject();
                 } catch (IOException | ClassNotFoundException e) {
-                    // Handle any exceptions that occur during deserialization
                     e.printStackTrace();
                 }
                 
@@ -110,7 +109,6 @@ public class Main {
                 try {
                     encryptedTGT = CryptoStuff.getInstance().encrypt(secretKey, tgtBytes);
                 } catch (InvalidAlgorithmParameterException | CryptoException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
 
@@ -142,10 +140,8 @@ public class Main {
                 objectOutputStream.flush();
             }
 
-        } catch (IOException | ClassNotFoundException e) {
+        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException e) {
             e.printStackTrace();
-        } catch (NoSuchAlgorithmException e1) {
-            e1.printStackTrace();
         }
     }
 
