@@ -7,7 +7,7 @@ import java.util.Map;
 import org.example.utils.User;
 
 public class Authentication {
-    private static final String FILE_PATH = "./users.txt";
+    private static final String FILE_PATH = "/app/users.txt";
     private Map<String, User> users;
 
     public Authentication() {
@@ -23,30 +23,17 @@ public class Authentication {
             }
         }
     }
-    
-    public boolean register(String username, String password) {
-        try {
-            User user = new User(username, password);
-            users.put(username, user);
-            writeUsers();
-            return true;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
 
-    public boolean login(String username, String password) {
+    public String getUsernamePassword(String username) {
         try {
             User user = users.get(username);
             if (user == null) {
-                return false;
+                return "";
             }
-            String hashedPassword = user.hashPassword(password, user.getSalt());
-            return hashedPassword.equals(user.getHashedPassword());
+            return user.getHashedPassword();
         } catch (Exception e) {
             e.printStackTrace();
-            return false;
+            return "";
         }
     }
 
@@ -78,6 +65,19 @@ public class Authentication {
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
             return new HashMap<>();
+        }
+    }
+
+    // unused
+    public boolean register(String username, String password) {
+        try {
+            User user = new User(username, password);
+            users.put(username, user);
+            writeUsers();
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
         }
     }
 }

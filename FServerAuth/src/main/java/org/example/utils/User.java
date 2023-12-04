@@ -18,7 +18,7 @@ public class User implements Serializable {
     public User(String username, String password) throws NoSuchAlgorithmException {
         this.username = username;
         this.salt = generateSalt();
-        this.hashedPassword = hashPassword(password, this.salt);
+        this.hashedPassword = hashPassword(password);
     }
 
     private byte[] generateSalt() {
@@ -36,7 +36,7 @@ public class User implements Serializable {
         return sb.toString();
     }
 
-    public String hashPassword(String password, byte[] salt) throws NoSuchAlgorithmException {
+    public String hashPassword(String password) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance(HASHING_ALGORITHMS);
         md.update(salt);
         byte[] bytes = md.digest(password.getBytes());

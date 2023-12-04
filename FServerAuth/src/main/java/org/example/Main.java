@@ -21,6 +21,7 @@ import javax.net.ssl.TrustManagerFactory;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
 import org.example.utils.TicketGrantingTicket;
+import org.example.utils.Wrapper;
 
 public class Main {
 
@@ -39,9 +40,9 @@ public class Main {
 
 
     public static void main(String[] args) {
+        Authentication authentication = new Authentication();
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
-        Authentication authentication = new Authentication();
         while (true) {
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
@@ -51,6 +52,7 @@ public class Main {
                 e.printStackTrace();
             }
         }
+        
     }
 
     private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket,Authentication authentication){
@@ -59,43 +61,38 @@ public class Main {
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
 
-            RequestMessage requestMessage;
-            while ((requestMessage = (RequestMessage) objectInputStream.readObject()) != null) {
+            Wrapper wrapper;
+            while ((wrapper = (Wrapper) objectInputStream.readObject()) != null) {
                 ResponseMessage response = null;
-                
-                if(authentication.login(requestMessage.getClientId(), requestMessage.getClientPassword())){
-                    
-                    KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
-                    kg.init(KEYSIZE);
+                RequestMessage requestMessage = (RequestMessage) wrapper.getObject();
+                byte messageType = wrapper.getMessageType();
+                KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
+                kg.init(KEYSIZE);
 
-                    SecretKey generatedkey = kg.generateKey();
+                SecretKey generatedkey = kg.generateKey();
                 
+                TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,requestMessage.getServiceId(), generatedkey);
+                
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                ObjectOutputStream out = null;
+                try {
+                    out = new ObjectOutputStream(bos);   
+                    out.writeObject(tgt);
+                    out.flush();
+                    byte[] tgtBytes = bos.toByteArray();
 
-                    TicketGrantingTicket tgt = new TicketGrantingTicket(requestMessage.getClientId(),requestMessage.getClientAddress() ,"ACCESS_CONTROL", generatedkey);
-                    
-                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                    ObjectOutputStream out = null;
+                    response = new ResponseMessage(generatedkey,tgtBytes);
+                } catch (IOException e ) {
+                    e.printStackTrace();
+                } finally {
                     try {
-                        out = new ObjectOutputStream(bos);   
-                        out.writeObject(tgt);
-                        out.flush();
-                        byte[] tgtBytes = bos.toByteArray();
-
-                        response = new ResponseMessage(generatedkey,tgtBytes);
-                    } catch (IOException e ) {
-                        e.printStackTrace();
-                    } finally {
-                        try {
-                            bos.close();
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                        }
+                        bos.close();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
                     }
-                }else{
-                     response = new ResponseMessage(null,null);
                 }
                 
-                objectOutputStream.writeObject(response);
+                objectOutputStream.writeObject(new Wrapper(messageType, response));
                 objectOutputStream.flush();
             }
 

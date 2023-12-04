@@ -2,6 +2,7 @@ package org.example.utils;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 public class RequestMessage implements Serializable {
     @Serial
@@ -10,19 +11,13 @@ public class RequestMessage implements Serializable {
     private final String clientId;
     private final String serviceId;
     private final String clientAddress;
-    private final String clientPassword;
-    private final int nonce;
+    private final LocalDateTime timestamp;
 
-    public RequestMessage(String clientId,String clientAddress, String clientPassword ,String serviceId ,int nonce) {
+    public RequestMessage(String clientId, String clientAddress, String serviceId, LocalDateTime timestamp) {
         this.clientId = clientId;
         this.serviceId = serviceId;
-        this.nonce = nonce;
         this.clientAddress = clientAddress;
-        this.clientPassword = clientPassword;
-    }
-
-    public String getClientPassword() {
-        return this.clientPassword;
+        this.timestamp = timestamp;
     }
 
     public String getClientId() {
@@ -37,16 +32,7 @@ public class RequestMessage implements Serializable {
         return this.serviceId;
     }
 
-    public int getNonce() {
-        return nonce;
-    }
-
-    @Override
-    public String toString() {
-    return "RequestMessage{" +
-            "clientId='" + clientId + '\'' +
-            ", serviceId='" + serviceId + '\'' +
-            ", nonce=" + nonce +
-            '}';
+    public LocalDateTime getTimestamp() {
+        return timestamp;
     }
 }

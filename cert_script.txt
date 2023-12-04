@@ -45,3 +45,9 @@ keytool -import -file access_control.cer -keystore truststore.jks -storepass dis
 
 --truststore--
 keytool -import -file dispatcher.cer -keystore truststore.jks -storepass client_truststore_password -alias dispatcher
+
+
+****** USER CREDENTIALS ******
+
+username: client
+password: 12345
