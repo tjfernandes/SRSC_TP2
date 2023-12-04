@@ -47,7 +47,7 @@ public class Main {
     public static final String TRUSTSTORE_PATH = "/app/truststore.jks";
     public static final String TLS_VERSION = "TLSv1.2";
     public static final int PORT_2_DISPATCHER = 8082;
-    private static final String KEYS_PATH = "keys.properties",
+    private static final String KEYS_PATH = "/app/keys.properties";
 
     private static final String ALGORITHM = "AES";
     private static final int KEYSIZE = 256;
@@ -164,16 +164,17 @@ public class Main {
             SecretKey generatedkey = kg.generateKey();
 
             // create ticket
-            ServiceGrantingTicket t = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId,
+            ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId,
                     generatedkey);
-            LocalDateTime issueTime = t.getIssueTime();
+            LocalDateTime issueTime = sgt.getIssueTime();
 
             // serialize the ticket and encrypt it
-            byte[] sgt = serializeObject(t);
-            sgt = CryptoStuff.encrypt(storageKey, sgt);
+            byte[] sgtSerialized = serializeObject(sgt);
+            sgtSerialized = CryptoStuff.encrypt(storageKey, sgtSerialized);
 
             // serialize and encrypt message
-            byte[] payloadSerialized = serializeObject(new ResponseMessage(sessionKey, serviceId, issueTime, sgt));
+            byte[] payloadSerialized = serializeObject(
+                    new ResponseMessage(sessionKey, serviceId, issueTime, sgtSerialized));
             payloadSerialized = CryptoStuff.encrypt(sessionKey, payloadSerialized);
 
             // create wrapper message
