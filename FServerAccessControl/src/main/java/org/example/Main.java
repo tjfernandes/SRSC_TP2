@@ -2,20 +2,21 @@ package org.example;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStreamWriter;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Enumeration;
 import java.util.Properties;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -23,12 +24,15 @@ import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
 
+import org.example.Crypto.CryptoException;
+import org.example.Crypto.CryptoStuff;
 import org.example.utils.RequestMessage;
 import org.example.utils.ResponseMessage;
 import org.example.utils.ServiceGrantingTicket;
 import org.example.utils.TicketGrantingTicket;
 
 import java.security.cert.Certificate;
+import java.time.LocalDateTime;
 
 public class Main {
 
@@ -44,8 +48,8 @@ public class Main {
     public static final String ALGORITHM = "AES";
     public static final int KEYSIZE = 256;
 
-    private static String tgsKey;
-    private static String storageKey;
+    private static SecretKey tgsKey;
+    private static SecretKey storageKey;
 
     private static SSLServerSocket serverSocket;
 
@@ -59,8 +63,9 @@ public class Main {
             e.printStackTrace();
         }
 
-        tgsKey = props.getProperty("TGS_KEY");
-        storageKey = props.getProperty("STORAGE_KEY");
+        // converting from String to SecretKey
+        tgsKey = convertStringToSecretKeyto(props.getProperty("TGS_KEY"));
+        storageKey = convertStringToSecretKeyto(props.getProperty("STORAGE_KEY"));
 
         initTLSSocket();
 
@@ -131,28 +136,63 @@ public class Main {
                 System.out.println("Received message: " + requestMessage);
 
                 String serviceId = requestMessage.getServiceId();
-                TicketGrantingTicket tgt = requestMessage.getTgt();
+                byte[] ticketGT = requestMessage.getTgt();
                 byte[] authenticator = requestMessage.getAuthenticator();
 
+                // decrypt TGT
+                CryptoStuff cryptoStuff = CryptoStuff.getInstance();
+                ticketGT = cryptoStuff.decrypt(tgsKey, ticketGT);
+
+                // deserialize TGT
+                ByteArrayInputStream bis = new ByteArrayInputStream(ticketGT);
+                ObjectInputStream ois = new ObjectInputStream(bis);
+                TicketGrantingTicket tgt = (TicketGrantingTicket) ois.readObject();
+                SecretKey sessionKey = convertStringToSecretKeyto(tgt.getKey());
+
+                // generate key for ticket
                 KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
                 kg.init(KEYSIZE);
                 SecretKey generatedkey = kg.generateKey();
 
-                ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(),
+                // create ticket
+                ServiceGrantingTicket t = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(),
                         serviceId, generatedkey);
+                LocalDateTime issueTime = t.getIssueTime();
 
-                ResponseMessage responseMessage = new ResponseMessage(generatedkey, serviceId, sgt.getIssueTime(), sgt);
+                // serialize the ticket and encrypt it
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                ObjectOutputStream oos = new ObjectOutputStream(bos);
+                oos.writeObject(t);
+                byte[] sgt = bos.toByteArray();
+                sgt = CryptoStuff.encrypt(storageKey, sgt);
+
+                // serialize and encrypt message
+                bos = new ByteArrayOutputStream();
+                oos = new ObjectOutputStream(bos);
+                oos.writeObject(new ResponseMessage(generatedkey, serviceId, issueTime, sgt));
+                byte[] responseMessage = bos.toByteArray();
+                responseMessage = CryptoStuff.encrypt(sessionKey, responseMessage);
+
+                // send message
                 objectOutputStream.writeObject(responseMessage);
                 objectOutputStream.flush();
 
+                // closing streams/sockets
                 objectOutputStream.close();
                 objectInputStream.close();
                 requestSocket.close();
 
             }
-        } catch (IOException | NoSuchAlgorithmException | ClassNotFoundException e) {
+        } catch (IOException | NoSuchAlgorithmException | ClassNotFoundException | InvalidAlgorithmParameterException
+                | CryptoException e) {
             e.printStackTrace();
+        }
+    }
 
+    public static SecretKey convertStringToSecretKeyto(String encodedKey) {
+        byte[] decodedKey = Base64.getDecoder().decode(encodedKey);
+        SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
+        return originalKey;
     }
 
     /*

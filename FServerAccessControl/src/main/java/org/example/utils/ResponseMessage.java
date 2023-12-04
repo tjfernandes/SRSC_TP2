@@ -11,9 +11,9 @@ public class ResponseMessage implements Serializable {
     private final String serviceId;
     private final LocalDateTime timestamp;
     private final SecretKey sessionKey;
-    private final ServiceGrantingTicket sgt;
+    private final byte[] sgt;
 
-    public ResponseMessage(SecretKey sessionKey, String serviceId, LocalDateTime timestamp, ServiceGrantingTicket sgt) {
+    public ResponseMessage(SecretKey sessionKey, String serviceId, LocalDateTime timestamp, byte[] sgt) {
         this.serviceId = serviceId;
         this.timestamp = timestamp;
         this.sessionKey = sessionKey;
@@ -32,7 +32,7 @@ public class ResponseMessage implements Serializable {
         return sessionKey;
     }
 
-    public ServiceGrantingTicket getSgt() {
+    public byte[] getSgt() {
         return sgt;
     }
 }
