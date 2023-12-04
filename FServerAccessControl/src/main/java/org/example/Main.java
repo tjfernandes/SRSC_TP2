@@ -47,9 +47,10 @@ public class Main {
     public static final String TRUSTSTORE_PATH = "/app/truststore.jks";
     public static final String TLS_VERSION = "TLSv1.2";
     public static final int PORT_2_DISPATCHER = 8082;
+    private static final String KEYS_PATH = "keys.properties",
 
-    public static final String ALGORITHM = "AES";
-    public static final int KEYSIZE = 256;
+    private static final String ALGORITHM = "AES";
+    private static final int KEYSIZE = 256;
 
     private static SecretKey tgsKey;
     private static SecretKey storageKey;
@@ -60,7 +61,7 @@ public class Main {
         System.out.println("Hello world!");
 
         Properties props = new Properties();
-        try (FileInputStream input = new FileInputStream("keys.properties")) {
+        try (FileInputStream input = new FileInputStream(KEYS_PATH)) {
             props.load(input);
         } catch (IOException e) {
             e.printStackTrace();
@@ -132,67 +133,62 @@ public class Main {
             // Communication logic with the request
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
+            Wrapper wrapper = (Wrapper) objectInputStream.readObject();
+            System.out.println("Received message: " + wrapper);
 
-            Wrapper wrapper;
+            // deserialize request message
+            RequestMessage requestMessage = (RequestMessage) deserializeObject(wrapper.getMessage());
 
-            while ((wrapper = (Wrapper) objectInputStream.readObject()) != null) {
-                System.out.println("Received message: " + wrapper);
+            String serviceId = requestMessage.getServiceId();
+            byte[] tgtSerialized = requestMessage.getTgt();
+            byte[] authenticatorSerialized = requestMessage.getAuthenticator();
 
-                // deserialize request message
-                RequestMessage requestMessage = (RequestMessage) deserializeObject(wrapper.getMessage());
-                
+            // deserialize authenticator
+            Authenticator authenticator = (Authenticator) deserializeObject(authenticatorSerialized);
 
-                String serviceId = requestMessage.getServiceId();
-                byte[] ticketGT = requestMessage.getTgt();
-                byte[] authenticatorSerialized = requestMessage.getAuthenticator();
+            // decrypt and deserialize TGT
+            CryptoStuff.getInstance();
+            tgtSerialized = CryptoStuff.decrypt(tgsKey, tgtSerialized);
+            TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(tgtSerialized);
+            SecretKey sessionKey = convertStringToSecretKeyto(tgt.getKey());
 
-                // deserialize authenticator
-                Authenticator authenticator = (Authenticator) deserializeObject(authenticatorSerialized);
-
-
-                // decrypt and deserialize TGT
-                CryptoStuff.getInstance();
-                ticketGT = CryptoStuff.decrypt(tgsKey, ticketGT);
-                TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(ticketGT);
-                SecretKey sessionKey = convertStringToSecretKeyto(tgt.getKey());
-
-                // check if authenticator is valid
-                if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
-                    System.out.println("Authenticator is not valid");
-                    return;
-                }
-
-                // generate key for ticket
-                KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
-                kg.init(KEYSIZE);
-                SecretKey generatedkey = kg.generateKey();
-
-                // create ticket
-                ServiceGrantingTicket t = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId, generatedkey);
-                LocalDateTime issueTime = t.getIssueTime();
-
-                // serialize the ticket and encrypt it
-                byte[] sgt = serializeObject(t); 
-                sgt = CryptoStuff.encrypt(storageKey, sgt);
-
-                // serialize and encrypt message
-                byte[] payloadSerialized = serializeObject(new ResponseMessage(sessionKey, serviceId, issueTime, sgt));
-                payloadSerialized = CryptoStuff.encrypt(sessionKey, payloadSerialized);
-
-                // create wrapper message
-                UUID id = UUID.randomUUID();
-                Wrapper wrapperMessage = new Wrapper((byte) 4, payloadSerialized, id);
-
-                // send wrapper message
-                objectOutputStream.writeObject(wrapperMessage);
-                objectOutputStream.flush();
-
-                // closing streams/sockets
-                objectOutputStream.close();
-                objectInputStream.close();
-                requestSocket.close();
-
+            // check if authenticator is valid
+            if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
+                System.out.println("Authenticator is not valid");
+                return;
             }
+
+            // generate key for ticket
+            KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
+            kg.init(KEYSIZE);
+            SecretKey generatedkey = kg.generateKey();
+
+            // create ticket
+            ServiceGrantingTicket t = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId,
+                    generatedkey);
+            LocalDateTime issueTime = t.getIssueTime();
+
+            // serialize the ticket and encrypt it
+            byte[] sgt = serializeObject(t);
+            sgt = CryptoStuff.encrypt(storageKey, sgt);
+
+            // serialize and encrypt message
+            byte[] payloadSerialized = serializeObject(new ResponseMessage(sessionKey, serviceId, issueTime, sgt));
+            payloadSerialized = CryptoStuff.encrypt(sessionKey, payloadSerialized);
+
+            // create wrapper message
+            UUID id = UUID.randomUUID();
+            Wrapper wrapperMessage = new Wrapper((byte) 4, payloadSerialized, id);
+
+            // send wrapper message
+            objectOutputStream.writeObject(wrapperMessage);
+            objectOutputStream.flush();
+
+            // closing streams/sockets
+            objectOutputStream.close();
+            objectInputStream.close();
+            requestSocket.close();
+
         } catch (IOException | NoSuchAlgorithmException | ClassNotFoundException | InvalidAlgorithmParameterException
                 | CryptoException e) {
             e.printStackTrace();
@@ -204,7 +200,6 @@ public class Main {
         SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
         return originalKey;
     }
-
 
     private static byte[] serializeObject(Object object) {
         try {
@@ -230,6 +225,5 @@ public class Main {
         }
         return null;
     }
-
 
 }
