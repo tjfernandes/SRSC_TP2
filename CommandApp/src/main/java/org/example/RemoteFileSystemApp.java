@@ -30,7 +30,7 @@ public class RemoteFileSystemApp {
     public static void main(String[] args) throws IOException {
         System.setProperty("javax.net.debug", "ssl");
         try {
-            // Sleep for 1 second (1000 milliseconds)
+            // Sleep for 10 second (1000 milliseconds)
             Thread.sleep(10000);
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -52,12 +52,10 @@ public class RemoteFileSystemApp {
         writer.newLine();
         writer.flush();
 
+        String response = "";
         // Read the server's response
-        String response = reader.readLine();
-
-        reader.close();
-        writer.close();
-        socket.close();
+        response = reader.readLine();
+        System.out.println("response:" + response);
 
         return response;
     }
@@ -66,28 +64,14 @@ public class RemoteFileSystemApp {
         SSLSocket socket = null;
         try {
 
-            KeyStore keyStore = KeyStore.getInstance("JKS");
-            keyStore.load(RemoteFileSystemApp.class.getResourceAsStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(keyStore, KEYSTORE_PASSWORD.toCharArray());
-
-            KeyStore trustStore = KeyStore.getInstance(TRUSTSTORE_TYPE);
+            KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(RemoteFileSystemApp.class.getResourceAsStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD);
-            Enumeration<String> aliases = trustStore.aliases();
-
-            while (aliases.hasMoreElements()) {
-                String alias = aliases.nextElement();
-                Certificate certificate = trustStore.getCertificate(alias);
-                System.out.println("Alias: " + alias);
-                System.out.println("Certificate: " + certificate.toString());
-            }
-
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
             // Set up the SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
-            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
+            sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
@@ -95,19 +79,11 @@ public class RemoteFileSystemApp {
             System.out.println("PORT: " + DISPATCHER_PORT);
 
             socket = (SSLSocket) sslSocketFactory.createSocket(DISPATCHER_HOST, DISPATCHER_PORT);
+            socket.setUseClientMode(true);
             socket.setEnabledProtocols(CONFPROTOCOLS);
             socket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
-            System.out.println("Supported Ciphersuites: " + String.join(", ", socket.getEnabledCipherSuites()));
-
             socket.startHandshake();
-
-            SSLSession session = socket.getSession();
-
-            System.out.println();
-            System.out.println("Hum from my offer server decided to select\n");
-            System.out.println("TLS protocol version: " + session.getProtocol());
-            System.out.println("Ciphersuite: " + session.getCipherSuite());
 
         } catch (Exception e) {
             e.printStackTrace();

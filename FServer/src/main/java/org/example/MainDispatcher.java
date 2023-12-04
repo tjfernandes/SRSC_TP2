@@ -80,28 +80,26 @@ public class MainDispatcher {
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
+            // KeyStore trustStore = KeyStore.getInstance("JKS");
+            // trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
 
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustManagerFactory.init(trustStore);
+            // TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            // trustManagerFactory.init(trustStore);
 
             // SSLContext
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
-            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
+            sslContext.init(kmf.getKeyManagers(), null, null);
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-            serverSocket.setUseClientMode(true);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
             serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
-
-            System.out.println("Supported Ciphersuites: " + String.join(", ", serverSocket.getEnabledCipherSuites()));
 
             System.out.println("Server is listening on port 8080...");
 
             while (true) {
-                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                Thread clientThread = new Thread(() -> handleRequest(clientSocket));
+                SSLSocket socket = (SSLSocket) serverSocket.accept();
+
+                Thread clientThread = new Thread(() -> handleRequest(socket));
                 clientThread.start();
             }
 
@@ -110,12 +108,12 @@ public class MainDispatcher {
         }
     }
 
-    private static void handleRequest(SSLSocket clientSocket) {
+    private static void handleRequest(SSLSocket socket) {
         try {
             System.out.println("ENTROU handle request");
             // Communication logic with the client
-            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 
             String command;
             while((command = reader.readLine()) != null) {
@@ -161,10 +159,6 @@ public class MainDispatcher {
 //                    default: break;
 //                }
             }
-
-            writer.close();
-            reader.close();
-            clientSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

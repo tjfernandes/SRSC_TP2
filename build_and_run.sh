@@ -18,7 +18,6 @@ mvn clean package
 
 cd ../CommandApp
 mvn clean package
-cp target/CommandApp-1.jar ../
 
 cd ..
 docker-compose up -d
@@ -28,4 +27,4 @@ docker network connect srsc_tp2-fserver-network srsc_tp2-fserver-access-control-
 docker network connect srsc_tp2-fserver-network srsc_tp2-fserver-storage-service-1
 docker network connect srsc_tp2-fserver-network srsc_tp2-fserver-service-1
 
-java -jar CommandApp-1.jar
+java -jar CommandApp/target/CommandApp-1.jar
