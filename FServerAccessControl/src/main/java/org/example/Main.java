@@ -10,14 +10,12 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.UUID;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -28,7 +26,6 @@ import javax.net.ssl.TrustManagerFactory;
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.utils.Authenticator;
-import org.example.utils.Command;
 import org.example.utils.RequestTGSMessage;
 import org.example.utils.ResponseTGSMessage;
 import org.example.utils.ServiceGrantingTicket;
@@ -68,8 +65,9 @@ public class Main {
         }
 
         // converting from String to SecretKey
-        tgsKey = convertStringToSecretKeyto(props.getProperty("TGS_KEY"));
-        storageKey = convertStringToSecretKeyto(props.getProperty("STORAGE_KEY"));
+        tgsKey = CryptoStuff.getInstance().convertStringToSecretKey(props.getProperty("TGS_KEY"));
+        System.out.println("TGS key: " + tgsKey);
+        storageKey = CryptoStuff.getInstance().convertStringToSecretKey(props.getProperty("STORAGE_KEY"));
 
         initTLSSocket();
         accessControl = new AccessControl();
@@ -141,14 +139,13 @@ public class Main {
             RequestTGSMessage requestTGSMessage = (RequestTGSMessage) deserializeObject(wrapper.getMessage());
 
             String serviceId = requestTGSMessage.getServiceId();
-            byte[] tgtSerialized = requestTGSMessage.getTgt();
-            byte[] authenticatorSerialized = requestTGSMessage.getAuthenticator();
+            byte[] tgtSerialized = requestTGSMessage.getEncryptedTGT();
+            byte[] authenticatorSerialized = requestTGSMessage.getEncryptedAuthenticator();
 
             // decrypt and deserialize TGT
-            CryptoStuff.getInstance();
             tgtSerialized = CryptoStuff.getInstance().decrypt(tgsKey, tgtSerialized);
             TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(tgtSerialized);
-            SecretKey keyClientTGS = convertStringToSecretKeyto(tgt.getKey());
+            SecretKey keyClientTGS = tgt.getKey();
 
             // decrypt and deserialize authenticator
             authenticatorSerialized = CryptoStuff.getInstance().decrypt(keyClientTGS, authenticatorSerialized);
@@ -199,12 +196,6 @@ public class Main {
                 | CryptoException e) {
             e.printStackTrace();
         }
-    }
-
-    private static SecretKey convertStringToSecretKeyto(String encodedKey) {
-        byte[] decodedKey = Base64.getDecoder().decode(encodedKey);
-        SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
-        return originalKey;
     }
 
     private static byte[] serializeObject(Object object) {

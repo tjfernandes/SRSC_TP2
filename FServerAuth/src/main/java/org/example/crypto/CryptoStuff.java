@@ -68,7 +68,6 @@ public class CryptoStuff {
         int len = hex.length();
         byte[] ans = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            // using left shift operator on every character
             ans[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
                     + Character.digit(hex.charAt(i+1), 16));
         }

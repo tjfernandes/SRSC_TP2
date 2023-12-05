@@ -2,14 +2,10 @@ package org.example.utils;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.security.InvalidAlgorithmParameterException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
 import javax.crypto.SecretKey;
-
-import org.example.crypto.CryptoException;
-import org.example.crypto.CryptoStuff;
 
 public class ResponseAuthenticationMessage implements Serializable {
     @Serial
@@ -18,20 +14,13 @@ public class ResponseAuthenticationMessage implements Serializable {
     private final SecretKey generatedKey;
     private final LocalDateTime issueTime;
     private final Duration lifetime;
-    private byte[] encryptedTGT;
+    private final byte[] encryptedTGT;
 
     public ResponseAuthenticationMessage(SecretKey generatedKey, byte[] encryptedTGT) {
         this.generatedKey = generatedKey;
         this.issueTime = LocalDateTime.now();
         this.lifetime = Duration.ofHours(8);
-        this.encryptedTGT = null;
-        try {
-            this.encryptedTGT = CryptoStuff.getInstance().encrypt(generatedKey, encryptedTGT);
-        } catch (InvalidAlgorithmParameterException e) {
-            System.out.println("Error encrypting TGT: Invalid algorithm parameter");
-        } catch (CryptoException e) {
-            System.out.println("Error encrypting TGT: Invalid algorithm parameter");
-        }
+        this.encryptedTGT = encryptedTGT;
     }
 
     public LocalDateTime getIssueTime() {

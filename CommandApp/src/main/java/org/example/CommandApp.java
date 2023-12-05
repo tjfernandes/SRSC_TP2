@@ -225,30 +225,29 @@ public class CommandApp {
 
     private static CommandReturn requestCommand(SSLSocket socket,  String[] fullCommand, byte[] payload) {
         CommandReturn commandReturn = null;
+        Authenticator authenticator = null;
+        byte[] authenticatorSerialized = null;
+        Command command;
+        ResponseServiceMessage responseServiceMessage;
         try {
-            // Waits a little for server initialization
-            Thread.sleep(2000);
-
-            Authenticator authenticator = null;
-            byte[] authenticatorSerialized = null;
-            Command command;
-            ResponseServiceMessage responseServiceMessage;
             switch (fullCommand[0]) {
                 case "ls", "mkdir":
-                    if (fullCommand.length != 3)
-                        throw new InvalidCommandException("Command format should be: " + fullCommand[0] + " path");
-
-                    command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
-
+                    if (fullCommand.length < 2 || fullCommand.length > 3)
+                        throw new InvalidCommandException("Command format should be: " + fullCommand[0] + " username path");
+                    if (fullCommand.length == 2){
+                        command = new Command(fullCommand[0], fullCommand[1], null);
+                    } else {
+                        command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
+                    }
                     // Request SGT from TGS
                     authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    
                     authenticatorSerialized = serialize(authenticator);
-                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(), CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
                     sendServiceRequest(socket, command);
-                    Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
 
@@ -268,7 +267,6 @@ public class CommandApp {
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
                     sendServiceRequest(socket, command);
-                    Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
 
@@ -288,7 +286,6 @@ public class CommandApp {
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
                     sendServiceRequest(socket, command);
-                    Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
 
@@ -308,7 +305,6 @@ public class CommandApp {
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
                     sendServiceRequest(socket, command);
-                    Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
 
@@ -319,8 +315,6 @@ public class CommandApp {
                 default:
                     throw new InvalidCommandException("Command '" + fullCommand[0] + "' is invalid");
             }
-
-
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -357,9 +351,10 @@ public class CommandApp {
             byte[] requestMessageSerialized = serialize(requestMessage);
 
             // Create wrapper object with serialized request message for auth and its type
-            Wrapper wrapper = new Wrapper((byte) 1, requestMessageSerialized, UUID.randomUUID());
+            Wrapper wrapper = new Wrapper((byte) 3, requestMessageSerialized, UUID.randomUUID());
 
             // Send wrapper to dispatcher
+            System.out.println("Sending TGS request: " + wrapper);
             oos.writeObject(wrapper);
             oos.flush();
         } catch (Exception e) {

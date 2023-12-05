@@ -28,5 +28,4 @@ public class RequestTGSMessage implements Serializable {
     public byte[] getEncryptedAuthenticator() {
         return encryptedAuthenticator;
     }
-
 }

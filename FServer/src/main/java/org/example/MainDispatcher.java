@@ -103,16 +103,18 @@ public class MainDispatcher {
             SSLSocket socket = initTLSClientSocket(chooseModule(request));
 
             // Forward the request to the correct socket
+            System.out.println("Forwarding request to " + chooseModule(request));
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
             objectOutputStream.writeObject(request);
             objectOutputStream.flush();
 
             // Get the response from the correct socket
+            System.out.println("Waiting for response from " + chooseModule(request));
             ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
             Wrapper response = (Wrapper) objectInputStream.readObject();
 
             // Handle the response
-            new Thread(() -> handleResponse(response)).start();
+            handleResponse(response);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -95,6 +95,7 @@ public class Main {
             // Key to encrypt TGT
             String keyTGT = props.getProperty(TGS_KEY);
             SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKey(keyTGT);
+            System.out.println("TGS key: " + secretKeyTGT);
 
             // Key to encrypt response
             byte[] key = authentication.getUsernamePassword(requestAuthenticationMessage.getClientId());
