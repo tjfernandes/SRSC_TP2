@@ -45,6 +45,9 @@ public class Main {
     public static final String TGS_KEY_PATH = "/app/crypto-config.properties";
     public static final String TGS_KEY = "TGS_AS_KEY";
 
+    public static final int OK = 200;
+    public static final int UNAUTHORIZED = 401;
+
 
     public static void main(String[] args) {
         Authentication authentication = new Authentication();
@@ -58,23 +61,18 @@ public class Main {
         Properties props = new Properties();
         try (FileInputStream input = new FileInputStream(TGS_KEY_PATH)) {
             props.load(input);
+            while (true) {
+                SSLSocket socket = (SSLSocket) serverSocket.accept();
+                new Thread(() -> handleRequest(socket, authentication, props)).start();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        while (true) {
-            try {
-                SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket, authentication, props));
-                clientThread.start();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
-    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, Authentication authentication, Properties props) {
+    private static void handleRequest(SSLSocket requestSocket, Authentication authentication, Properties props) {
         try {
+
             // Create input and output streams for the socket
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
@@ -96,19 +94,21 @@ public class Main {
 
             // Key to encrypt TGT
             String keyTGT = props.getProperty(TGS_KEY);
-            System.out.println("keyTGT: " + keyTGT);
             SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKey(keyTGT);
 
             // Key to encrypt response
             byte[] key = authentication.getUsernamePassword(requestAuthenticationMessage.getClientId());
-            System.out.println("key: " + key);
-            System.out.println("key.length: " + key.length);
+            if (key == null) {
+                objectOutputStream.writeObject(new Wrapper(messageType, null, uuid, UNAUTHORIZED));
+                objectOutputStream.flush();
+                return;
+            }
             SecretKey secretKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(key);
 
             // Encrypt TGT and send it to the client
             byte[] encryptedTGT = CryptoStuff.getInstance().encrypt(secretKeyTGT, tgtBytes);
             byte[] responseBytes = serialize(new ResponseAuthenticationMessage(generatedkey, encryptedTGT));
-            objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid));
+            objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid, OK));
             objectOutputStream.flush();
 
         } catch (Exception e) {

@@ -1,7 +1,6 @@
 package org.example.utils;
 
 import java.io.Serializable;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
@@ -18,7 +17,6 @@ public class User implements Serializable {
 
     private String username;
     private byte[] hashedPassword;
-
 
     public User(String username, String password) throws NoSuchAlgorithmException, InvalidKeySpecException {
         this.username = username;
