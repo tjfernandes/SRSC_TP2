@@ -58,8 +58,6 @@ public class Main {
     private static SSLServerSocket serverSocket;
 
     public static void main(String[] args) {
-        System.out.println("Hello world!");
-
         Properties props = new Properties();
         try (FileInputStream input = new FileInputStream(KEYS_PATH)) {
             props.load(input);
