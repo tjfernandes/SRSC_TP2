@@ -18,14 +18,16 @@ public class ServiceGrantingTicket implements Serializable{
     private final SecretKey keyClientServer;
     private final LocalDateTime issueTime;
     private final Duration lifetime;
+    private final Command command;
 
-    public ServiceGrantingTicket(String clientId, String clientAddress, String serverIdentifier, SecretKey keyClientServer) {
+    public ServiceGrantingTicket(String clientId, String clientAddress, String serverIdentifier, SecretKey keyClientServer, Command command) {
         this.clientId = clientId;
         this.clientAddress = clientAddress;
         this.serverIdentifier = serverIdentifier;
         this.keyClientServer = keyClientServer;
         this.issueTime = LocalDateTime.now();
         this.lifetime = Duration.ofMinutes(5); // TGT validity period
+        this.command = command;
     }
 
     public String getClientAddress() {
@@ -52,5 +54,7 @@ public class ServiceGrantingTicket implements Serializable{
         return this.clientId;
     }
 
-    
+    public Command getCommand() {
+        return command;
+    }
 }

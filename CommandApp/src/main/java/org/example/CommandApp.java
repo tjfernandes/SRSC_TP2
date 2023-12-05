@@ -23,7 +23,7 @@ import java.security.spec.KeySpec;
 import java.util.Base64;
 import java.util.UUID;
 
-public class RemoteFileSystemApp {
+public class CommandApp {
 
     public static final String[] CONFPROTOCOLS     = {"TLSv1.2"};
     public static final String[] CONFCIPHERSUITES  = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
@@ -196,7 +196,7 @@ public class RemoteFileSystemApp {
         try {
 
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(RemoteFileSystemApp.class.getResourceAsStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD);
+            trustStore.load(CommandApp.class.getResourceAsStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD);
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
@@ -239,14 +239,8 @@ public class RemoteFileSystemApp {
             // Waits a little for server initialization
             Thread.sleep(2000);
 
-            // Handle TGS
-            Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR);
-            byte[] authenticatorSerialized = serialize(authenticator);
-            sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                    CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized));
-
-            responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
-
+            Authenticator authenticator = null;
+            byte[] authenticatorSerialized = null;
             Command command;
             ResponseServiceMessage responseServiceMessage;
             switch (fullCommand[0]) {
@@ -255,6 +249,16 @@ public class RemoteFileSystemApp {
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + " path");
 
                     command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
+
+
+                    // Request SGT from TGS
+                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticatorSerialized = serialize(authenticator);
+                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
+                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+
+                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
+
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -266,6 +270,15 @@ public class RemoteFileSystemApp {
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path/file");
 
                     command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2]);
+
+                    // Request SGT from TGS
+                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticatorSerialized = serialize(authenticator);
+                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
+                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+
+                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
+
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -277,6 +290,15 @@ public class RemoteFileSystemApp {
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path/file");
 
                     command = new Command(fullCommand[0], fullCommand[1], fullCommand[1]);
+
+                    // Request SGT from TGS
+                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticatorSerialized = serialize(authenticator);
+                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
+                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+
+                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
+
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -288,6 +310,15 @@ public class RemoteFileSystemApp {
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
 
                     command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2], fullCommand[3]);
+
+                    // Request SGT from TGS
+                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticatorSerialized = serialize(authenticator);
+                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
+                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+
+                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
+
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -328,7 +359,7 @@ public class RemoteFileSystemApp {
         }
     }
 
-    public static void sendTGSRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator) {
+    public static void sendTGSRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator, Command command) {
         try {
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
@@ -353,10 +384,10 @@ public class RemoteFileSystemApp {
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
-            Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR);
+            Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
             byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(), serialize(authenticator));
 
-            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator, command);
+            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator);
             byte[] requestMessageSerialized = serialize(requestServiceMessage);
 
             // Create wrapper object with serialized request message for auth and its type
@@ -380,7 +411,7 @@ public class RemoteFileSystemApp {
             Wrapper wrapper = (Wrapper) ois.readObject();
             int responseStatus = wrapper.getStatus();
             switch (responseStatus) {
-                case 204:
+                case 200:
                     byte[] encryptedResponse = wrapper.getMessage();
 
                     SecretKey clientKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(hashPassword(password));
@@ -392,7 +423,7 @@ public class RemoteFileSystemApp {
                     }
 
                     break;
-                case 404:
+                case 401:
                     throw new UserNotFoundException("User '" + clientId + "' does not exist");
                 default:
                     break;
@@ -412,6 +443,8 @@ public class RemoteFileSystemApp {
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
             Wrapper wrapper = (Wrapper) ois.readObject();
+
+            int responseStatus = wrapper.getStatus();
 
             byte[] encryptedResponse = wrapper.getMessage();
             byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);

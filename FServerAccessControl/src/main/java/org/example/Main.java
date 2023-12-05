@@ -163,7 +163,7 @@ public class Main {
 
             // create ticket
             ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId,
-                    generatedkey);
+                    generatedkey, null);
             LocalDateTime issueTime = sgt.getIssueTime();
 
             // serialize the ticket and encrypt it
