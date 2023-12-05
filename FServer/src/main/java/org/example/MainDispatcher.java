@@ -55,7 +55,7 @@ public class MainDispatcher {
 
         // Create a new thread to the client
         new Thread(() -> initTLSServerSocket()).start();
-        System.out.println("Server started on port " + MY_PORT);
+        System.out.println("Server listening on port " + MY_PORT + "...");
     
         // sleep for 10 second to make sure the server socket is ready
         Thread.sleep(10000);
@@ -69,21 +69,18 @@ public class MainDispatcher {
     private static void initTLSServerSocket() {
         try {
             //Keystore
-            System.out.println("Loading keystore...");
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
             // TrustStore
-            System.out.println("Loading truststore...");
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
     
             // SSLContext
-            System.out.println("Setting up SSL context...");
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
@@ -93,10 +90,10 @@ public class MainDispatcher {
 
             while (true) {
                 SSLSocket socket = (SSLSocket) serverSocket.accept();
-                System.out.println("New connection accepted");
                 ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
+                System.out.println("Waiting for request...");
                 Wrapper message = (Wrapper) objectInputStream.readObject();
-                System.out.println(message);
+                System.out.println("Wrapper: " + message);
                 Thread clientThread = new Thread(() -> clientHandleRequest(message, socket));
                 clientThread.start();
             }
@@ -111,34 +108,38 @@ public class MainDispatcher {
             // Add the client socket to the map
             clientSocketMap.put(request.getMessageId(), clientSocket);
 
-            // Choose the correct socket for this request
-            SSLSocket targetSocket = chooseSocket(request);
-            if (targetSocket == null) {
-                // Handle the case where there's no socket for this request
-                System.out.println("No socket for request: " + request);
-                return;
-            }
+            // Get the correct socket for this request
+            SSLSocket socket = initTLSClientSocket(chooseSocket(request));
 
             // Forward the request to the correct socket
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(targetSocket.getOutputStream());
+            System.out.println("Forwarding request: " + request);
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
             objectOutputStream.writeObject(request);
             objectOutputStream.flush();
+
+
+            //new Thread(() -> handleResponse()).start();
+
+            // Wait for the response
+            ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
+            Wrapper response = (Wrapper) objectInputStream.readObject();
+            System.out.println("Response: " + response);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static SSLSocket chooseSocket(Wrapper request) {
+    private static ModuleName chooseSocket(Wrapper request) {
         byte type = request.getMessageType();
 
         // Choose the correct socket based on the message type
         switch (type) {
             case 1:
-                return socketMap.get(ModuleName.AUTHENTICATION);
+                return ModuleName.AUTHENTICATION;
             case 3:
-                return socketMap.get(ModuleName.ACCESS_CONTROL);
+                return ModuleName.ACCESS_CONTROL;
             case 6:
-                return socketMap.get(ModuleName.STORAGE);
+                return ModuleName.STORAGE;
             default:
                 System.out.println("Invalid message type: " + type);
                 return null;
@@ -164,10 +165,13 @@ public class MainDispatcher {
         }
     }
 
-    private static void initTLSClientSocket(ModuleName module) {
+    private static SSLSocket initTLSClientSocket(ModuleName module) {
+        System.out.println("Initializing TLS client socket for module: " + module);
         SSLSocket socket = null;
         try {
             String[] hostAndPort = getHostAndPort(module);
+            System.out.println("Host: " + hostAndPort[0]);
+            System.out.println("Port: " + hostAndPort[1]);
     
             //KeyStore
             System.out.println("Loading keystore...");
@@ -198,17 +202,11 @@ public class MainDispatcher {
             // Start the handshake
             System.out.println("Starting handshake...");
             socket.startHandshake();
-
-            // Add the socket to the map
-            socketMap.put(module, socket);
-
-            ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
-            Wrapper message = (Wrapper) objectInputStream.readObject();
-            new Thread(() -> handleResponse(message)).start();
     
-        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException | UnrecoverableKeyException | ClassNotFoundException e) {
+        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException | UnrecoverableKeyException e) {
             e.printStackTrace();
         }
+        return socket;
     }
 
 }
