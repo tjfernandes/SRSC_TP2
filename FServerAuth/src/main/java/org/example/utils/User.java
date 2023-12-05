@@ -3,46 +3,45 @@ package org.example.utils;
 import java.io.Serializable;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
+import java.util.Base64;
+
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 
 public class User implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private static final String HASHING_ALGORITHMS = "SHA-256";
+    private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
     private static final byte[] salt = {0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,0x0f, 0x0d, 0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04};
 
     private String username;
-    private String hashedPassword;
+    private byte[] hashedPassword;
 
 
-    public User(String username, String password) throws NoSuchAlgorithmException {
+    public User(String username, String password) throws NoSuchAlgorithmException, InvalidKeySpecException {
         this.username = username;
         this.hashedPassword = hashPassword(password);
     }
 
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
 
-        System.out.println("HEX KEY SIZE: " + sb.length());
-        return sb.toString();
-    }
+    public static byte[] hashPassword(String password) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        int iterations = 10000;
+        int keyLength = 256;
 
-
-    public String hashPassword(String password) throws NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance(HASHING_ALGORITHMS);
-        md.update(salt);
-        byte[] bytes = md.digest(password.getBytes());
-        System.out.println("bytes key length: " + bytes.length);
-        return bytesToHex(bytes);
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, keyLength);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance(HASHING_ALGORITHMS);
+        byte[] hash = factory.generateSecret(spec).getEncoded();
+        System.out.println("Hashed password: " + Base64.getEncoder().encodeToString(hash));
+        return hash;
     }
 
     public String getUsername() {
         return username;
     }
 
-    public String getHashedPassword() {
+    public byte[] getHashedPassword() {
         return hashedPassword;
     }
 

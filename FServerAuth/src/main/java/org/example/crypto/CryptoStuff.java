@@ -59,7 +59,7 @@ public class CryptoStuff {
         }
     }
 
-    public SecretKey convertStringToSecretKeyto(String encodedKey) {
+    public SecretKey convertStringToSecretKey(String encodedKey) {
         byte[] decodedKey = hexToBytes(encodedKey);
         System.out.println("BYTE KEY SIZE: " + decodedKey.length);
         SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
@@ -77,5 +77,11 @@ public class CryptoStuff {
         }
 
         return ans;
+    }
+
+    public SecretKey convertByteArrayToSecretKey(byte[] key) {
+        System.out.println("Key: " + Base64.getEncoder().encodeToString(key));
+        SecretKey secretKey = new SecretKeySpec(key, 0, key.length, "AES");
+        return secretKey;
     }
 }

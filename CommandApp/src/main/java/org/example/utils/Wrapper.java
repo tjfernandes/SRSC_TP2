@@ -30,7 +30,6 @@ public class Wrapper implements java.io.Serializable {
     public String toString() {
         return "Wrapper{" +
                 "messageType=" + messageType +
-                ", message=" + new String(message) +
                 ", messageId=" + messageId +
                 '}';
     }

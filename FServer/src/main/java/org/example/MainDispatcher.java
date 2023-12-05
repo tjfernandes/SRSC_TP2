@@ -45,9 +45,7 @@ public class MainDispatcher {
                 throw new IllegalArgumentException("Invalid module name");
         }
     }
-
-    // Create a map of ModuleName to SSLSocket
-    static Map<ModuleName, SSLSocket> socketMap = new HashMap<>();
+    
     // A map from request IDs to client sockets
     private static Map<UUID, SSLSocket> clientSocketMap = new HashMap<>();
 
@@ -56,14 +54,6 @@ public class MainDispatcher {
         // Create a new thread to the client
         new Thread(() -> initTLSServerSocket()).start();
         System.out.println("Server started on port " + MY_PORT);
-    
-        // sleep for 10 second to make sure the server socket is ready
-        Thread.sleep(10000);
-
-        // Create a new thread for each module
-        // new Thread(() -> initTLSClientSocket(ModuleName.STORAGE)).start();
-        new Thread(() -> initTLSClientSocket(ModuleName.AUTHENTICATION)).start();
-        //new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
     }
 
     private static void initTLSServerSocket() {
@@ -111,31 +101,32 @@ public class MainDispatcher {
             // Add the client socket to the map
             clientSocketMap.put(request.getMessageId(), clientSocket);
 
-            // Choose the correct socket for this request
-            SSLSocket targetSocket = chooseSocket(request);
-            if (targetSocket == null) {
-                // Handle the case where there's no socket for this request
-                System.out.println("No socket for request: " + request);
-                return;
-            }
+            SSLSocket socket = initTLSClientSocket(chooseModule(request));
 
             // Forward the request to the correct socket
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(targetSocket.getOutputStream());
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
             objectOutputStream.writeObject(request);
             objectOutputStream.flush();
+
+            // Get the response from the correct socket
+            ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
+            Wrapper response = (Wrapper) objectInputStream.readObject();
+
+            // Handle the response
+            handleResponse(response);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static SSLSocket chooseSocket(Wrapper request) {
+    private static ModuleName chooseModule(Wrapper request) {
         byte type = request.getMessageType();
 
         // Choose the correct socket based on the message type
         return switch (type) {
-            case 1 -> socketMap.get(ModuleName.AUTHENTICATION);
-            case 3 -> socketMap.get(ModuleName.ACCESS_CONTROL);
-            case 6 -> socketMap.get(ModuleName.STORAGE);
+            case 1 -> ModuleName.AUTHENTICATION;
+            case 3 -> ModuleName.ACCESS_CONTROL;
+            case 6 -> ModuleName.STORAGE;
             default -> {
                 System.out.println("Invalid message type: " + type);
                 yield null;
@@ -162,7 +153,7 @@ public class MainDispatcher {
         }
     }
 
-    private static void initTLSClientSocket(ModuleName module) {
+    private static SSLSocket initTLSClientSocket(ModuleName module) {
         SSLSocket socket = null;
         try {
             String[] hostAndPort = getHostAndPort(module);
@@ -197,16 +188,12 @@ public class MainDispatcher {
             System.out.println("Starting handshake...");
             socket.startHandshake();
 
-            // Add the socket to the map
-            socketMap.put(module, socket);
-
-            ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
-            Wrapper message = (Wrapper) objectInputStream.readObject();
-            new Thread(() -> handleResponse(message)).start();
+            return socket;
     
-        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException | UnrecoverableKeyException | ClassNotFoundException e) {
+        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException | UnrecoverableKeyException e) {
             e.printStackTrace();
         }
+        return null;
     }
 
 }

@@ -6,9 +6,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Properties;
 import java.util.UUID;
@@ -22,7 +20,6 @@ import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
 
-import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
 import org.example.utils.RequestAuthenticationMessage;
 import org.example.utils.ResponseAuthenticationMessage;
@@ -51,8 +48,8 @@ public class Main {
 
     public static void main(String[] args) {
         Authentication authentication = new Authentication();
-        //TODO - inserir client para test
-        authentication.register("client", "12345");
+        // Register a user
+        //authentication.register("client", "12345");
 
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
@@ -78,8 +75,6 @@ public class Main {
 
     private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, Authentication authentication, Properties props) {
         try {
-
-            System.out.println("ENTRA");
             // Create input and output streams for the socket
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
@@ -102,12 +97,13 @@ public class Main {
             // Key to encrypt TGT
             String keyTGT = props.getProperty(TGS_KEY);
             System.out.println("keyTGT: " + keyTGT);
-            SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKeyto(keyTGT);
+            SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKey(keyTGT);
 
             // Key to encrypt response
-            String key = authentication.getUsernamePassword(requestAuthenticationMessage.getClientId());
-            System.out.println("KEY STRING: " + key);
-            SecretKey secretKey = CryptoStuff.getInstance().convertStringToSecretKeyto(key);
+            byte[] key = authentication.getUsernamePassword(requestAuthenticationMessage.getClientId());
+            System.out.println("key: " + key);
+            System.out.println("key.length: " + key.length);
+            SecretKey secretKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(key);
 
             // Encrypt TGT and send it to the client
             byte[] encryptedTGT = CryptoStuff.getInstance().encrypt(secretKeyTGT, tgtBytes);
@@ -115,8 +111,7 @@ public class Main {
             objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid));
             objectOutputStream.flush();
 
-        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | CryptoException |
-                 InvalidAlgorithmParameterException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

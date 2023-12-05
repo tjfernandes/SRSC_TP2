@@ -24,16 +24,16 @@ public class Authentication {
         }
     }
 
-    public String getUsernamePassword(String username) {
+    public byte[] getUsernamePassword(String username) {
         try {
             User user = users.get(username);
             if (user == null) {
-                return "";
+                return null;
             }
             return user.getHashedPassword();
         } catch (Exception e) {
             e.printStackTrace();
-            return "";
+            return null;
         }
     }
 
