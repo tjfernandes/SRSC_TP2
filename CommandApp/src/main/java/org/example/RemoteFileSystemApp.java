@@ -124,13 +124,17 @@ public class RemoteFileSystemApp {
             String[] fullCommand = command.split(" ");
             String response = "";
             try {
-                SSLSocket socket = initTLSSocket();
+                
                 if (fullCommand[0].equals("login")) {
-                    processLogin(socket);
+                    if (fullCommand.length != 3)
+                        throw new InvalidCommandException("Command format should be: login username password");
+                    SSLSocket socket = initTLSSocket();
+                    processLogin(socket, fullCommand[1], fullCommand[2]);
                     response = "User '" + fullCommand[1] + "' authenticated with success!";
                 } else {
                     if (responseAuthenticationMessage != null) {
                         response = "Command: " + command;
+                        SSLSocket socket = initTLSSocket();
 //                        CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
 //                        byte[] payloadReceived = commandReturn.getPayload();
 //                        if (!Arrays.equals(payloadReceived, new byte[0])) {
@@ -218,11 +222,11 @@ public class RemoteFileSystemApp {
         return socket;
     }
 
-    private static void processLogin(SSLSocket socket) {
+    private static void processLogin(SSLSocket socket, String clientId, String password) {
         try {
             // Handle auth
-            Login.sendAuthRequest(socket);
-            responseAuthenticationMessage = Login.processAuthResponse(socket);
+            Login.sendAuthRequest(socket, clientId);
+            responseAuthenticationMessage = Login.processAuthResponse(socket, password);
         } catch (Exception e) {
             e.printStackTrace();
         }

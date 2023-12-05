@@ -25,16 +25,6 @@ public class User implements Serializable {
         this.hashedPassword = hashPassword(password);
     }
 
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-
-        System.out.println("HEX KEY SIZE: " + sb.length());
-        return sb.toString();
-    }
-
 
     public static byte[] hashPassword(String password) throws NoSuchAlgorithmException, InvalidKeySpecException {
         int iterations = 10000;

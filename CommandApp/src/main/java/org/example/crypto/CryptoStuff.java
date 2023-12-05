@@ -7,6 +7,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 
 public class CryptoStuff {
 
@@ -58,6 +59,12 @@ public class CryptoStuff {
         System.out.println("BYTE KEY SIZE: " + decodedKey.length);
         SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
         return originalKey;
+    }
+
+    public SecretKey convertByteArrayToSecretKey(byte[] key) {
+        System.out.println("Key: " + Base64.getEncoder().encodeToString(key));
+        SecretKey secretKey = new SecretKeySpec(key, 0, key.length, "AES");
+        return secretKey;
     }
 
     private byte[] hexToBytes(String hex) {
