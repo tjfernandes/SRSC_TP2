@@ -4,7 +4,6 @@ import java.security.Key;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
@@ -61,7 +60,6 @@ public class CryptoStuff {
 
     public SecretKey convertStringToSecretKey(String encodedKey) {
         byte[] decodedKey = hexToBytes(encodedKey);
-        System.out.println("BYTE KEY SIZE: " + decodedKey.length);
         SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
         return originalKey;
     }
@@ -69,18 +67,15 @@ public class CryptoStuff {
     private byte[] hexToBytes(String hex) {
         int len = hex.length();
         byte[] ans = new byte[len / 2];
-
         for (int i = 0; i < len; i += 2) {
             // using left shift operator on every character
             ans[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
                     + Character.digit(hex.charAt(i+1), 16));
         }
-
         return ans;
     }
 
     public SecretKey convertByteArrayToSecretKey(byte[] key) {
-        System.out.println("Key: " + Base64.getEncoder().encodeToString(key));
         SecretKey secretKey = new SecretKeySpec(key, 0, key.length, "AES");
         return secretKey;
     }

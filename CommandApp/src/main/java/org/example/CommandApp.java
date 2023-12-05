@@ -1,6 +1,7 @@
 package org.example;
 
 
+import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
 import org.example.exceptions.IncorrectPasswordException;
 import org.example.exceptions.InvalidCommandException;
@@ -16,6 +17,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
@@ -39,8 +41,7 @@ public class CommandApp {
 
 
 
-    private static final String HASHING_ALGORITHMS = "SHA-256";
-    private static final String CLIENT_PASS = "12345";
+    private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
 
     private static final String TGS_ID = "access_control";
     private static final String CLIENT_ID = "client";
@@ -52,6 +53,7 @@ public class CommandApp {
 
 
     public static void main(String[] args) {
+
         JFrame frame = new JFrame("Remote FS");
         frame.setSize(800, 400);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -123,55 +125,50 @@ public class CommandApp {
         requestButton.addActionListener(e -> {
             String command = commandTextField.getText();
             String[] fullCommand = command.split(" ");
-            String response = "";
-            try {
-                
-                if (fullCommand[0].equals("login")) {
-                    if (fullCommand.length != 3)
-                        throw new InvalidCommandException("Command format should be: login username password");
-                    SSLSocket socket = initTLSSocket();
+            String response = null;
+            if (fullCommand[0].equals("login")) {
+                if (fullCommand.length != 3)
+                    throw new InvalidCommandException("Command format should be: login username password");
+                SSLSocket socket = initTLSSocket();
+                try {
                     processLogin(socket, fullCommand[1], fullCommand[2]);
                     response = "User '" + fullCommand[1] + "' authenticated with success!";
-                } else {
-                    if (responseAuthenticationMessage != null) {
-                        response = "Command: " + command;
-                        SSLSocket socket = initTLSSocket();
-//                        CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
-//                        byte[] payloadReceived = commandReturn.getPayload();
-//                        if (!Arrays.equals(payloadReceived, new byte[0])) {
-//                            String userHome = System.getProperty("user.home");
-//                            String downloadsDir;
-//
-//                            String fileName = UUID.randomUUID().toString();
-//
-//                            // Determine the default downloads directory based on the operating system
-//                            String os = System.getProperty("os.name").toLowerCase();
-//                            if (os.contains("win")) {
-//                                downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
-//                            } else if (os.contains("mac")) {
-//                                downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
-//                            } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-//                                downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
-//                            } else {
-//                                downloadsDir = userHome + "/" + fileName; // For other systems
-//                            }
-//
-//                            try(FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-//                                fos.write(payloadReceived);
-//                                response = "File downloaded successfully to: " + downloadsDir;
-//                            } catch (Exception ex) {
-//                                response = "File wasn't successfully downloaded in dir: " + downloadsDir;
-//                            }
-//
-//                      }
-                    } else {
-                        response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
-                                   "Authenticate user with command: login username password";
-                    }
+                } catch (UserNotFoundException | IncorrectPasswordException ex) {
+                    response = ex.getMessage();
                 }
+            } else {
+                if (responseAuthenticationMessage != null) {
+                    response = "Command: " + command;
+                    SSLSocket socket = initTLSSocket();
+                    CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
+                    byte[] payloadReceived = commandReturn.getPayload();
+                    String userHome = System.getProperty("user.home");
+                    String downloadsDir;
 
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
+                    String fileName = UUID.randomUUID().toString();
+
+                    // Determine the default downloads directory based on the operating system
+                    String os = System.getProperty("os.name").toLowerCase();
+                    if (os.contains("win")) {
+                        downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
+                    } else if (os.contains("mac")) {
+                        downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
+                    } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+                        downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
+                    } else {
+                        downloadsDir = userHome + "/" + fileName; // For other systems
+                    }
+
+                    try(FileOutputStream fos = new FileOutputStream(downloadsDir)) {
+                        fos.write(payloadReceived);
+                        response = "File downloaded successfully to: " + downloadsDir;
+                    } catch (Exception ex) {
+                        response = "File wasn't successfully downloaded in dir: " + downloadsDir;
+                    }
+                } else {
+                    response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
+                                "Authenticate user with command: login username password";
+                }
             }
             outputText.setText(response + "\n");
             commandTextField.setText("");
@@ -206,9 +203,6 @@ public class CommandApp {
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
-            System.out.println("HOST: " + DISPATCHER_HOST);
-            System.out.println("PORT: " + DISPATCHER_PORT);
-
             socket = (SSLSocket) sslSocketFactory.createSocket(DISPATCHER_HOST, DISPATCHER_PORT);
             socket.setUseClientMode(true);
             socket.setEnabledProtocols(CONFPROTOCOLS);
@@ -223,14 +217,10 @@ public class CommandApp {
         return socket;
     }
 
-    private static void processLogin(SSLSocket socket, String clientId, String password) {
-        try {
-            // Handle auth
-            sendAuthRequest(socket, clientId);
-            responseAuthenticationMessage = processAuthResponse(socket, clientId, password);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    private static void processLogin(SSLSocket socket, String clientId, String password) throws UserNotFoundException, IncorrectPasswordException {
+        // Handle auth
+        sendAuthRequest(socket, clientId);
+        responseAuthenticationMessage = processAuthResponse(socket, clientId, password);
     }
 
     private static CommandReturn requestCommand(SSLSocket socket,  String[] fullCommand, byte[] payload) {
@@ -250,12 +240,10 @@ public class CommandApp {
 
                     command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
 
-
                     // Request SGT from TGS
                     authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
                     authenticatorSerialized = serialize(authenticator);
-                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
@@ -401,7 +389,7 @@ public class CommandApp {
         }
     }
 
-    public static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket, String clientId, String password) {
+    public static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket, String clientId, String password) throws IncorrectPasswordException, UserNotFoundException {
         ResponseAuthenticationMessage responseAuthenticationMessage = null;
         try {
             System.out.println("ENTRA processAUthResponse");
@@ -413,24 +401,20 @@ public class CommandApp {
             switch (responseStatus) {
                 case 200:
                     byte[] encryptedResponse = wrapper.getMessage();
-
-                    SecretKey clientKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(hashPassword(password));
-                    byte[] descryptedResponse = CryptoStuff.getInstance().decrypt(clientKey, encryptedResponse);
                     try {
+                        SecretKey clientKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(hashPassword(password));
+                        byte[] descryptedResponse = CryptoStuff.getInstance().decrypt(clientKey, encryptedResponse);
                         responseAuthenticationMessage = (ResponseAuthenticationMessage) deserialize(descryptedResponse);
-                    } catch (Exception e) {
+                    } catch (CryptoException e) {
                         throw new IncorrectPasswordException("This password is incorrect.");
                     }
-
                     break;
                 case 401:
                     throw new UserNotFoundException("User '" + clientId + "' does not exist");
                 default:
                     break;
             }
-
-
-        } catch (Exception e) {
+        } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | NoSuchAlgorithmException | InvalidKeySpecException e) {
             e.printStackTrace();
         }
         return responseAuthenticationMessage;
