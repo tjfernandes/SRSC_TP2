@@ -150,7 +150,7 @@ public class Main {
             CryptoStuff.getInstance();
             tgtSerialized = CryptoStuff.decrypt(tgsKey, tgtSerialized);
             TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(tgtSerialized);
-            SecretKey sessionKey = convertStringToSecretKeyto(tgt.getKey());
+            SecretKey keyClientTGS = convertStringToSecretKeyto(tgt.getKey());
 
             // check if authenticator is valid
             if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
@@ -173,13 +173,12 @@ public class Main {
             sgtSerialized = CryptoStuff.encrypt(storageKey, sgtSerialized);
 
             // serialize and encrypt message
-            byte[] payloadSerialized = serializeObject(
-                    new ResponseMessage(sessionKey, serviceId, issueTime, sgtSerialized));
-            payloadSerialized = CryptoStuff.encrypt(sessionKey, payloadSerialized);
+            byte[] msgSerialized = serializeObject(
+                    new ResponseMessage(keyClientTGS, serviceId, issueTime, sgtSerialized));
+            msgSerialized = CryptoStuff.encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message
-            UUID id = UUID.randomUUID();
-            Wrapper wrapperMessage = new Wrapper((byte) 4, payloadSerialized, id);
+            Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, UUID.randomUUID());
 
             // send wrapper message
             objectOutputStream.writeObject(wrapperMessage);
