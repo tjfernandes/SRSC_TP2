@@ -28,6 +28,7 @@ public class Command {
         this.cpToPath = null;
     }
 
+
     public String getCpToPath() {
         return cpToPath;
     }

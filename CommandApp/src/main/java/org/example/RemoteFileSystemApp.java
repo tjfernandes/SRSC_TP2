@@ -1,10 +1,8 @@
 package org.example;
 
 
-import org.example.utils.RequestAuthenticationMessage;
-import org.example.utils.ResponseAuthenticationMessage;
-import org.example.utils.ResponseTGSMessage;
-import org.example.utils.Wrapper;
+import org.example.crypto.CryptoStuff;
+import org.example.utils.*;
 
 import java.awt.event.*;
 import javax.crypto.SecretKey;
@@ -12,8 +10,9 @@ import javax.net.ssl.*;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
-import java.net.Socket;
 import java.security.KeyStore;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -31,6 +30,17 @@ public class RemoteFileSystemApp {
     public static final String TLS_VERSION         = "TLSv1.2";
     public static final String DISPATCHER_HOST     = "localhost";
     public static final int DISPATCHER_PORT        = 8080;
+
+
+
+    private static final String HASHING_ALGORITHMS = "SHA-256";
+    private static final String CLIENT_PASS = "12345";
+
+    private static final String TGS_ID = "access_control";
+    private static final String CLIENT_ID = "client";
+    private static final String CLIENT_ADDR = "127.0.0.1";
+    private static final String SERVICE_ID = "storage";
+    private static final byte[] salt = {0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,0x0f, 0x0d, 0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04};;
 
     public static void main(String[] args) {
         JFrame frame = new JFrame("Remote FS");
@@ -83,83 +93,19 @@ public class RemoteFileSystemApp {
     private static String requestCommand(String command) throws IOException {
 
         try {
-            System.out.println("Command: " + command);
             SSLSocket socket = initTLSSocket();
 
-            System.out.println("Socket: " + socket.getSession());
-        
             String[] fullCommand = command.split("\\s+");
-            System.out.println("Full command: " + fullCommand[0] + " " + fullCommand[1] + " " + fullCommand[2]);
 
+            byte messageType;
             if (fullCommand[0].equals("login")) {
-                System.out.println("Login command");
                 processLogin(socket);
             }
-
-
 
         } catch (Exception e) {
             e.printStackTrace();
         }
         return "response";
-    }
-
-    private static void processLogin(SSLSocket socket) {
-        try {
-            sendRequest(socket, (byte) 1);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void sendRequest(SSLSocket socket, byte messageType) {
-        System.out.println("Sending request");
-    }
-
-    private static byte[] getRequestMessageSerialized(byte messageType) throws IOException {
-        Object requestMessage = null;
-        switch (messageType) {
-            case (byte) 1:
-                requestMessage = new RequestAuthenticationMessage("client", "localhost", "storage");
-                break;
-            case (byte) 3:
-                //requestMessage =
-                break;
-            case (byte) 5:
-                //
-                break;
-            default: break;
-        }
-        return new byte[0];
-    }
-
-    private static void processResponse(Wrapper wrapper) {
-        try {
-            ObjectInputStream objectInputStream = null;
-            switch(wrapper.getMessageType()) {
-                case (byte) 2:
-                    objectInputStream = new ObjectInputStream(new ByteArrayInputStream(wrapper.getMessage()));
-                    ResponseAuthenticationMessage responseAuth = (ResponseAuthenticationMessage) objectInputStream.readObject();
-
-                    byte[] encryptedTGT = responseAuth.getEncryptedTGT();
-                    SecretKey generatedKey = responseAuth.getGeneratedKey();
-                    LocalDateTime issuedTime = responseAuth.getIssueTime();
-                    Duration lifetime = responseAuth.getLifetime();
-                    break;
-                case (byte) 4:
-                    objectInputStream = new ObjectInputStream(new ByteArrayInputStream(wrapper.getMessage()));
-                    ResponseTGSMessage responseTGS = (ResponseTGSMessage) objectInputStream.readObject();
-
-                    break;
-                case (byte) 6:
-                    break;
-                default:
-                    System.out.println("Invalid message type");
-                    break;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private static SSLSocket initTLSSocket() {
@@ -185,9 +131,7 @@ public class RemoteFileSystemApp {
             socket.setEnabledProtocols(CONFPROTOCOLS);
             socket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
-            System.out.println("Starting handshake");
             socket.startHandshake();
-            System.out.println("Handshake done");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -195,5 +139,148 @@ public class RemoteFileSystemApp {
 
         return socket;
     }
+
+    private static void processLogin(SSLSocket socket) {
+        try {
+
+            // Handle auth
+            Login.sendAuthRequest(socket);
+            ResponseAuthenticationMessage responseAuthenticationMessage = Login.processAuthResponse(socket);
+            byte[] encryptedTGT = responseAuthenticationMessage.getEncryptedTGT();
+            SecretKey clientTGSKey = responseAuthenticationMessage.getGeneratedKey();
+
+            // Handle TGS
+            Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR);
+            byte[] authenticatorSerialized = serialize(authenticator);
+            Login.sendTGSRequest(socket, encryptedTGT, CryptoStuff.getInstance().encrypt(clientTGSKey, authenticatorSerialized));
+
+            ResponseTGTMessage responseTGTMessage = Login.processTGSResponse(socket, encryptedTGT, clientTGSKey);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void sendAuthRequest(SSLSocket socket) {
+        try {
+            // Communication logic with the server
+            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+
+            RequestAuthenticationMessage requestMessage = new RequestAuthenticationMessage(CLIENT_ID, CLIENT_ADDR, TGS_ID);
+
+            byte[] requestMessageSerialized = serialize(requestMessage);
+
+            // Create wrapper object with serialized request message for auth and its type
+            Wrapper wrapper = new Wrapper((byte) 1, requestMessageSerialized, UUID.randomUUID());
+
+            // Send wrapper to dispatcher
+            oos.writeObject(wrapper);
+            oos.flush();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void sendTGSRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator) {
+        try {
+            // Communication logic with the server
+            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+
+            RequestTGSMessage requestMessage = new RequestTGSMessage(SERVICE_ID, encryptedTGT, encryptedAuthenticator);
+
+            byte[] requestMessageSerialized = serialize(requestMessage);
+
+            // Create wrapper object with serialized request message for auth and its type
+            Wrapper wrapper = new Wrapper((byte) 1, requestMessageSerialized, UUID.randomUUID());
+
+            // Send wrapper to dispatcher
+            oos.writeObject(wrapper);
+            oos.flush();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void sendServiceRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator) {
+//        Req requestServiceMessage = null;
+//        try {
+//            // Communication logic with the server
+//            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+//
+//
+//
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+    }
+
+    private static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket) {
+        ResponseAuthenticationMessage responseAuthenticationMessage = null;
+        try {
+            // Communication logic with the server
+            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
+
+            Wrapper wrapper = (Wrapper) ois.readObject();
+            byte[] encryptedResponse = wrapper.getMessage();
+
+            SecretKey clientKey = CryptoStuff.getInstance().convertStringToSecretKeyto(hashPassword(CLIENT_PASS));
+            byte[] descryptedResponse = CryptoStuff.getInstance().decrypt(clientKey, encryptedResponse);
+
+            responseAuthenticationMessage = (ResponseAuthenticationMessage) deserialize(descryptedResponse);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return responseAuthenticationMessage;
+    }
+
+    private static ResponseTGTMessage processTGSResponse(SSLSocket socket, byte[] encryptedTGT, SecretKey key) {
+        ResponseTGTMessage responseTGTMessage = null;
+        try {
+            // Communication logic with the server
+            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
+
+            Wrapper wrapper = (Wrapper) ois.readObject();
+
+            byte[] encryptedResponse = wrapper.getMessage();
+            byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
+
+            responseTGTMessage = (ResponseTGTMessage) deserialize(decryptedResponse);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return responseTGTMessage;
+    }
+
+    private static byte[] serialize(Object object) throws IOException {
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+             ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
+            objectOutputStream.writeObject(object);
+            objectOutputStream.flush();
+            return byteArrayOutputStream.toByteArray();
+        }
+    }
+
+    private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
+        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+             ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
+            return objectInputStream.readObject();
+        }
+    }
+
+    private static String hashPassword(String password) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance(HASHING_ALGORITHMS);
+        md.update(salt);
+        byte[] bytes = md.digest(password.getBytes());
+        return bytesToHex(bytes);
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
 
 }
