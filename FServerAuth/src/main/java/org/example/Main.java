@@ -78,6 +78,8 @@ public class Main {
 
     private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, Authentication authentication, Properties props) {
         try {
+
+            System.out.println("ENTRA");
             // Create input and output streams for the socket
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());

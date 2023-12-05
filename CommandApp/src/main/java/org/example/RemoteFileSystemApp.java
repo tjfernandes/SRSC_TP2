@@ -46,8 +46,8 @@ public class RemoteFileSystemApp {
     private static final String CLIENT_ADDR = "127.0.0.1";
     private static final String SERVICE_ID = "storage";
     private static final byte[] salt = {0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,0x0f, 0x0d, 0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04};
-    private static ResponseAuthenticationMessage responseAuthenticationMessage;
-    private static ResponseTGSMessage responseTGSMessage;
+    private static ResponseAuthenticationMessage responseAuthenticationMessage = null;
+    private static ResponseTGSMessage responseTGSMessage = null;
 
 
     public static void main(String[] args) {
@@ -129,35 +129,36 @@ public class RemoteFileSystemApp {
                     processLogin(socket);
                     response = "User '" + fullCommand[1] + "' authenticated with success!";
                 } else {
-                    if (responseTGSMessage == null) {
-                        CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
-                        byte[] payloadReceived = payload[0];
-                        if (!Arrays.equals(payloadReceived, new byte[0])) {
-                            String userHome = System.getProperty("user.home");
-                            String downloadsDir;
-
-                            String fileName = UUID.randomUUID().toString();
-
-                            // Determine the default downloads directory based on the operating system
-                            String os = System.getProperty("os.name").toLowerCase();
-                            if (os.contains("win")) {
-                                downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
-                            } else if (os.contains("mac")) {
-                                downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
-                            } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-                                downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
-                            } else {
-                                downloadsDir = userHome + "/" + fileName; // For other systems
-                            }
-
-                            try(FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-                                fos.write(payloadReceived);
-                                response = "File downloaded successfully to: " + downloadsDir;
-                            } catch (Exception ex) {
-                                response = "File wasn't successfully downloaded in dir: " + downloadsDir;
-                            }
-
-                        }
+                    if (responseAuthenticationMessage != null) {
+                        response = "Command: " + command;
+//                        CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
+//                        byte[] payloadReceived = commandReturn.getPayload();
+//                        if (!Arrays.equals(payloadReceived, new byte[0])) {
+//                            String userHome = System.getProperty("user.home");
+//                            String downloadsDir;
+//
+//                            String fileName = UUID.randomUUID().toString();
+//
+//                            // Determine the default downloads directory based on the operating system
+//                            String os = System.getProperty("os.name").toLowerCase();
+//                            if (os.contains("win")) {
+//                                downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
+//                            } else if (os.contains("mac")) {
+//                                downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
+//                            } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+//                                downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
+//                            } else {
+//                                downloadsDir = userHome + "/" + fileName; // For other systems
+//                            }
+//
+//                            try(FileOutputStream fos = new FileOutputStream(downloadsDir)) {
+//                                fos.write(payloadReceived);
+//                                response = "File downloaded successfully to: " + downloadsDir;
+//                            } catch (Exception ex) {
+//                                response = "File wasn't successfully downloaded in dir: " + downloadsDir;
+//                            }
+//
+//                      }
                     } else {
                         response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
                                    "Authenticate user with command: login username password";
@@ -222,8 +223,6 @@ public class RemoteFileSystemApp {
             // Handle auth
             Login.sendAuthRequest(socket);
             responseAuthenticationMessage = Login.processAuthResponse(socket);
-            byte[] encryptedTGT = responseAuthenticationMessage.getEncryptedTGT();
-            SecretKey clientTGSKey = responseAuthenticationMessage.getGeneratedKey();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -232,13 +231,16 @@ public class RemoteFileSystemApp {
     private static CommandReturn requestCommand(SSLSocket socket,  String[] fullCommand, byte[] payload) {
         CommandReturn commandReturn = null;
         try {
+            // Waits a little for server initialization
+            Thread.sleep(2000);
+
             // Handle TGS
             Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR);
             byte[] authenticatorSerialized = serialize(authenticator);
             Login.sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
                     CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized));
 
-            responseTGSMessage = Login.processTGSResponse(socket, responseTGSMessage.getSessionKey());
+            responseTGSMessage = Login.processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
             Command command;
             ResponseServiceMessage responseServiceMessage;
@@ -247,7 +249,7 @@ public class RemoteFileSystemApp {
                     if (fullCommand.length != 3)
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + " path");
 
-                    command = new Command(fullCommand[0], fullCommand[2]);
+                    command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -258,7 +260,7 @@ public class RemoteFileSystemApp {
                     if (fullCommand.length != 3)
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path/file");
 
-                    command = new Command(fullCommand[0], payload, fullCommand[2]);
+                    command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2]);
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -269,7 +271,7 @@ public class RemoteFileSystemApp {
                     if (fullCommand.length != 2)
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path/file");
 
-                    command = new Command(fullCommand[0], fullCommand[1]);
+                    command = new Command(fullCommand[0], fullCommand[1], fullCommand[1]);
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -280,7 +282,7 @@ public class RemoteFileSystemApp {
                     if (fullCommand.length != 4)
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
 
-                    command = new Command(fullCommand[0], payload, fullCommand[2], fullCommand[3]);
+                    command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2], fullCommand[3]);
                     sendServiceRequest(socket, command);
                     Thread.sleep(5000);
                     responseServiceMessage = processServiceResponse(socket);
@@ -288,7 +290,7 @@ public class RemoteFileSystemApp {
 
                     break;
                 case "file":
-                    // TODO - construtores do CommandApp não consistentes com o enunciado?
+                    // TODO - construtores do CommandApp não consistentes com o enunciado? ou tripei?
                     break;
                 default:
                     throw new InvalidCommandException("Command '" + fullCommand[0] + "' is invalid");
