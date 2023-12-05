@@ -64,12 +64,7 @@ public class FsManager {
             return false;
         }
     
-        boolean ok = fs.uploadFile(encryptedContent, path);
-
-        if (!ok) {
-            return false;
-        }
-        return true;
+        return fs.uploadFile(encryptedContent, path);
     }
 
     public byte[] getCommand(String path) {
@@ -94,29 +89,14 @@ public class FsManager {
     }
 
     public boolean mkdirCommand(String path) {
-        boolean ok = fs.createFolder(path);
-        if (ok) {
-            return true;
-        } 
-        return false;
+        return fs.createFolder(path);
     }
 
     public boolean rmCommand(String path) {
-        boolean ok = fs.deleteFile(path);
-
-        if (!ok) {
-            return false;
-        }
-
-        return true;
+        return fs.deleteFile(path);
     }
 
     public boolean cpCommand(String sourcePath, String destinationPath) {
-        boolean ok = fs.copyFile(sourcePath, destinationPath);
-
-        if (!ok) {
-            return false;
-        }
-        return true;
+        return fs.copyFile(sourcePath, destinationPath);
     }
 }

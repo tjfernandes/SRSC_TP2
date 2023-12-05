@@ -27,5 +27,5 @@ public class CommandReturn {
 
     public byte[] getPayload() {
         return payload;
-    } 
+    }
 }

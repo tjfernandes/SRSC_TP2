@@ -25,20 +25,23 @@ import org.example.utils.Wrapper;
 
 public class Main {
 
-    public static final String[] CONFPROTOCOLS      = {"TLSv1.2"};;
-    public static final String[] CONFCIPHERSUITES   = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
-    public static final String KEYSTORE_PASSWORD    = "storage_password";
-    public static final String KEYSTORE_PATH        = "/app/keystore.jks";
-    public static final String TRUSTSTORE_PASSWORD  = "storage_truststore_password";
-    public static final String TRUSTSTORE_PATH      = "/app/truststore.jks";
-    public static final String TLS_VERSION          = "TLSv1.2";
-    public static final int PORT_2_DISPATCHER       = 8080;
-    public static final int MY_PORT                 = 8083;
+    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
+    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
+    public static final String KEYSTORE_PASSWORD = "storage_password";
+    public static final String KEYSTORE_PATH = "/app/keystore.jks";
+    public static final String TRUSTSTORE_PASSWORD = "storage_truststore_password";
+    public static final String TRUSTSTORE_PATH = "/app/truststore.jks";
+    public static final String TLS_VERSION = "TLSv1.2";
+    public static final int PORT_2_DISPATCHER = 8080;
+    public static final int MY_PORT = 8083;
     public static final String STORAGE_TGS_KEY_PATH = "/app/crypto-config.properties";
 
-    public static final String ALGORITHM            = "AES";
-    public static final int KEYSIZE                 = 256;
+    public static final String ALGORITHM = "AES";
+    public static final int KEYSIZE = 256;
 
+    enum CommandEnum {
+        GET, PUT, RM, LS, MKDIR, CP
+    }
 
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
@@ -60,7 +63,8 @@ public class Main {
         while (true) {
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket, fsManager,crypto,key));
+                Thread clientThread = new Thread(
+                        () -> handleRequest(clientSocket, serverSocket, fsManager, crypto, key));
                 clientThread.start();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -74,61 +78,46 @@ public class Main {
         return originalKey;
     }
 
+    public static CommandReturn processCommand(Command command, FsManager fsManager, CommandEnum commandEnum) {
+        byte[] payload = null;
+        boolean ok = false;
 
-    private static CommandReturn processGetCommand(Command command, FsManager fsManager) {
-        byte[] payload = fsManager.getCommand(command.getPath());
-        if (payload == null)
-            return new CommandReturn(command.getCommand(),404);
-        else
-            return new CommandReturn(command.getCommand(),payload,200);
-    }
+        switch (commandEnum) {
+            case GET:
+                payload = fsManager.getCommand(command.getPath());
+                break;
+            case PUT:
+                ok = fsManager.putCommand(command.getPath(), command.getPayload());
+                break;
+            case RM:
+                ok = fsManager.rmCommand(command.getPath());
+                break;
+            case LS:
+                payload = fsManager.lsCommand(command.getPath());
+                break;
+            case MKDIR:
+                ok = fsManager.mkdirCommand(command.getPath());
+                break;
+            case CP:
+                ok = fsManager.cpCommand(command.getPath(), command.getCpToPath());
+                break;
+        }
 
-    private static CommandReturn processPutCommand(Command command, FsManager fsManager) {
-        boolean ok = fsManager.putCommand(command.getPath(), command.getPayload());
         if (ok)
-            return new CommandReturn(command.getCommand(),200);
+            return new CommandReturn(command.getCommand(), 200);
+        else if (payload != null)
+            return new CommandReturn(command.getCommand(), payload, 200);
         else
-            return new CommandReturn(command.getCommand(),400);
+            return new CommandReturn(command.getCommand(), 400);
     }
 
-    private static CommandReturn processRmCommand(Command command, FsManager fsManager) {
-        boolean ok = fsManager.rmCommand(command.getPath());
-        if (ok)
-            return new CommandReturn(command.getCommand(),200);
-        else
-            return new CommandReturn(command.getCommand(),400);
-    }
-
-    private static CommandReturn processLsCommand(Command command, FsManager fsManager) {
-        byte[] payload = fsManager.lsCommand(command.getPath());
-        if (payload == null)
-            return new CommandReturn(command.getCommand(),404);
-        else
-            return new CommandReturn(command.getCommand(),payload,200);
-    }
-
-    private static CommandReturn processMkdirCommand(Command command, FsManager fsManager) {
-        boolean ok = fsManager.mkdirCommand(command.getPath());
-        if (ok)
-            return new CommandReturn(command.getCommand(),200);
-        else
-            return new CommandReturn(command.getCommand(),400);
-    }
-
-    private static CommandReturn processCpCommand(Command command, FsManager fsManager) {
-        boolean ok = fsManager.cpCommand(command.getPath(), command.getCpToPath());
-        if (ok)
-            return new CommandReturn(command.getCommand(),200);
-        else
-            return new CommandReturn(command.getCommand(),400);
-    }
-
-    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, FsManager fsManager, CryptoStuff crypto, SecretKey key) {
+    private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, FsManager fsManager,
+            CryptoStuff crypto, SecretKey key) {
         try {
             // Creating the streams
             ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
-    
+
             // Reading the RequestMessage
             Wrapper wrapper = (Wrapper) objectInputStream.readObject();
             RequestMessage requestMessage = (RequestMessage) deserialize(wrapper.getMessage());
@@ -137,28 +126,30 @@ public class Main {
 
             // Processing the RequestMessage
             ResponseMessage response = processRequest(requestMessage, fsManager, crypto, key);
-            
+
             byte[] encryptedResponse = crypto.encrypt(key, serialize(response));
 
             // Create a new Wrapper object with the byte array
-            Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse,messageId);
+            Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse, messageId);
 
             // Sending the ResponseMessage
             objectOutputStream.writeObject(responseWrapper);
             objectOutputStream.flush();
-    
+
             // // Closing the streams
             // objectOutputStream.close();
             // objectInputStream.close();
             // requestSocket.close();
-    
+
         } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | CryptoException e) {
             e.printStackTrace();
         }
     }
-    
-    private static ResponseMessage processRequest(RequestMessage requestMessage, FsManager fsManager, CryptoStuff crypto, SecretKey key) throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
-        
+
+    private static ResponseMessage processRequest(RequestMessage requestMessage, FsManager fsManager,
+            CryptoStuff crypto, SecretKey key)
+            throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
+
         // Decrypting the Service Granting Ticket
         byte[] encryptedsgt = requestMessage.getEncryptedSgt();
         byte[] sgtBytes = crypto.decrypt(key, encryptedsgt);
@@ -175,7 +166,7 @@ public class Main {
         if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
             return new ResponseMessage(new CommandReturn(requestMessage.getCommand().getCommand(), 403), returnTime);
         }
-        
+
         Command command = requestMessage.getCommand();
 
         // Checking if the command is valid
@@ -183,48 +174,25 @@ public class Main {
             return new ResponseMessage(new CommandReturn(requestMessage.getCommand().getCommand(), 403), returnTime);
         }
 
-        CommandReturn commandReturn;
-        // Handling request and get the response
-        switch (command.getCommand()) {
-            case "GET":
-                commandReturn = processGetCommand(command, fsManager);
-                break;
-            case "PUT":
-                commandReturn = processPutCommand(command, fsManager);
-                break;
-            case "RM":
-                commandReturn = processRmCommand(command, fsManager);
-                break;
-            case "LS":
-                commandReturn = processLsCommand(command, fsManager);
-                break;
-            case "MKDIR":
-                commandReturn = processMkdirCommand(command, fsManager);
-                break;
-            case "CP":
-                commandReturn = processCpCommand(command, fsManager);
-                break;
-            default:
-                commandReturn = new CommandReturn(command.getCommand(), 400);
-                break;
-        }
+        CommandReturn commandReturn = processCommand(command, fsManager, CommandEnum.valueOf(command.getCommand()));
 
-        return new ResponseMessage(commandReturn,returnTime);
+        return new ResponseMessage(commandReturn, returnTime);
     }
 
     private static SSLServerSocket server() {
 
         try {
-            //KeyStore
+            // KeyStore
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
-            
-            //TrustStore
+
+            // TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
             // SSLContext
@@ -233,8 +201,8 @@ public class Main {
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-	        serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
-            
+            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+
             return serverSocket;
 
         } catch (Exception e) {
@@ -245,7 +213,7 @@ public class Main {
 
     private static byte[] serialize(Object object) throws IOException {
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
+                ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
             objectOutputStream.writeObject(object);
             objectOutputStream.flush();
             return byteArrayOutputStream.toByteArray();
@@ -254,7 +222,7 @@ public class Main {
 
     private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-            ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
+                ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
             return objectInputStream.readObject();
         }
     }
