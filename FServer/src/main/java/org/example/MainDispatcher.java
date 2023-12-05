@@ -45,7 +45,7 @@ public class MainDispatcher {
                 throw new IllegalArgumentException("Invalid module name");
         }
     }
-    
+
     // A map from request IDs to client sockets
     private static Map<UUID, SSLSocket> clientSocketMap = new HashMap<>();
 
@@ -87,8 +87,7 @@ public class MainDispatcher {
                 ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
                 Wrapper message = (Wrapper) objectInputStream.readObject();
                 System.out.println(message);
-                Thread clientThread = new Thread(() -> clientHandleRequest(message, socket));
-                clientThread.start();
+                new Thread(() -> clientHandleRequest(message, socket)).start();
             }
 
         } catch (Exception e) {
@@ -113,7 +112,7 @@ public class MainDispatcher {
             Wrapper response = (Wrapper) objectInputStream.readObject();
 
             // Handle the response
-            handleResponse(response);
+            new Thread(() -> handleResponse(response)).start();
         } catch (Exception e) {
             e.printStackTrace();
         }

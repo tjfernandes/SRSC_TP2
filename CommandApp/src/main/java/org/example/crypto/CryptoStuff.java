@@ -56,7 +56,6 @@ public class CryptoStuff {
 
     public SecretKey convertStringToSecretKeyto(String encodedKey) {
         byte[] decodedKey = hexToBytes(encodedKey);
-        System.out.println("BYTE KEY SIZE: " + decodedKey.length);
         SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
         return originalKey;
     }
