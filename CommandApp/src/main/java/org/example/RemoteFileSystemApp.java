@@ -12,6 +12,7 @@ import javax.net.ssl.*;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
+import java.net.Socket;
 import java.security.KeyStore;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -82,17 +83,17 @@ public class RemoteFileSystemApp {
     private static String requestCommand(String command) throws IOException {
 
         try {
+            System.out.println("Command: " + command);
             SSLSocket socket = initTLSSocket();
 
-            // Communication logic with the server
-            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-
+            System.out.println("Socket: " + socket.getSession());
+        
             String[] fullCommand = command.split("\\s+");
+            System.out.println("Full command: " + fullCommand[0] + " " + fullCommand[1] + " " + fullCommand[2]);
 
-            byte messageType;
             if (fullCommand[0].equals("login")) {
-                processLogin(ois, oos);
+                System.out.println("Login command");
+                processLogin(socket);
             }
 
 
@@ -103,33 +104,16 @@ public class RemoteFileSystemApp {
         return "response";
     }
 
-    private static void processLogin(ObjectInputStream ois, ObjectOutputStream oos) {
+    private static void processLogin(SSLSocket socket) {
         try {
-            sendRequest(ois, oos, (byte) 1);
-            sendRequest(ois, oos, (byte) 3);
-            sendRequest(ois, oos, (byte) 5);
+            sendRequest(socket, (byte) 1);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static void sendRequest(ObjectInputStream ois, ObjectOutputStream oos, byte messageType) {
-        try {
-            byte[] requestMessageSerialized = getRequestMessageSerialized(messageType);
-
-            // Create wrapper object with serialized request message for auth and its type
-            Wrapper authWrapper = new Wrapper(messageType, requestMessageSerialized, UUID.randomUUID());
-
-            // Send wrapper to dispatcher
-            oos.writeObject(authWrapper);
-            oos.flush();
-
-            // handle response
-            Wrapper authWrapperResponse = (Wrapper) ois.readObject();
-            processResponse(authWrapperResponse);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    private static void sendRequest(SSLSocket socket, byte messageType) {
+        System.out.println("Sending request");
     }
 
     private static byte[] getRequestMessageSerialized(byte messageType) throws IOException {
@@ -146,12 +130,7 @@ public class RemoteFileSystemApp {
                 break;
             default: break;
         }
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-
-        objectOutputStream.writeObject(requestMessage);
-        byte[] requestMessageSerialized = byteArrayOutputStream.toByteArray();
-        return requestMessageSerialized;
+        return new byte[0];
     }
 
     private static void processResponse(Wrapper wrapper) {
@@ -206,7 +185,9 @@ public class RemoteFileSystemApp {
             socket.setEnabledProtocols(CONFPROTOCOLS);
             socket.setEnabledCipherSuites(CONFCIPHERSUITES);
 
+            System.out.println("Starting handshake");
             socket.startHandshake();
+            System.out.println("Handshake done");
 
         } catch (Exception e) {
             e.printStackTrace();

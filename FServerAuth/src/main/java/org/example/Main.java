@@ -104,7 +104,7 @@ public class Main {
             // Encrypt TGT and send it to the client
             byte[] encryptedTGT = CryptoStuff.getInstance().encrypt(secretKeyTGT, tgtBytes);
             byte[] responseBytes = serialize(new ResponseMessage(generatedkey, encryptedTGT));
-            objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes),uuid));
+            objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid));
             objectOutputStream.flush();
 
         } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | CryptoException | InvalidAlgorithmParameterException e) {

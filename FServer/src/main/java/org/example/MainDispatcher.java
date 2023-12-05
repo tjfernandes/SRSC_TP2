@@ -55,36 +55,48 @@ public class MainDispatcher {
 
         // Create a new thread to the client
         new Thread(() -> initTLSServerSocket()).start();
+        System.out.println("Server started on port " + MY_PORT);
     
+        // sleep for 10 second to make sure the server socket is ready
+        Thread.sleep(10000);
+
         // Create a new thread for each module
-        new Thread(() -> initTLSClientSocket(ModuleName.STORAGE)).start();
-        new Thread(() -> initTLSClientSocket(ModuleName.AUTHENTICATION)).start();
-        new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
+        // new Thread(() -> initTLSClientSocket(ModuleName.STORAGE)).start();
+        // new Thread(() -> initTLSClientSocket(ModuleName.AUTHENTICATION)).start();
+        // new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
     }
 
     private static void initTLSServerSocket() {
         try {
             //Keystore
+            System.out.println("Loading keystore...");
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
+
+            // TrustStore
+            System.out.println("Loading truststore...");
+            KeyStore trustStore = KeyStore.getInstance("JKS");
+            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
     
             // SSLContext
+            System.out.println("Setting up SSL context...");
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
-            sslContext.init(kmf.getKeyManagers(), null, null);
+            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
             serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
     
             while (true) {
-
-
                 SSLSocket socket = (SSLSocket) serverSocket.accept();
+                System.out.println("New connection accepted");
                 ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
                 Wrapper message = (Wrapper) objectInputStream.readObject();
-    
+                System.out.println(message);
                 Thread clientThread = new Thread(() -> clientHandleRequest(message, socket));
                 clientThread.start();
             }
@@ -157,42 +169,41 @@ public class MainDispatcher {
             String[] hostAndPort = getHostAndPort(module);
     
             //KeyStore
+            System.out.println("Loading keystore...");
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
     
             //TrustStore
+            System.out.println("Loading truststore...");
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-    
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
     
             // Set up the SSLContext
+            System.out.println("Setting up SSL context...");
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
     
             // Set up the socket to use TLSv1.2
+            System.out.println("Setting up socket...");
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
             socket.setEnabledProtocols(CONFPROTOCOLS);
             socket.setEnabledCipherSuites(CONFCIPHERSUITES);
     
             // Start the handshake
+            System.out.println("Starting handshake...");
             socket.startHandshake();
     
             // Add the socket to the map
             socketMap.put(module, socket);
             
             ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
-            Wrapper message;
-            while ((message = (Wrapper) objectInputStream.readObject()) != null) {
-                Wrapper threadSafeMessage = message;
-                new Thread(() -> {
-                    handleResponse(threadSafeMessage);
-                }).start();
-            }
+            Wrapper message = (Wrapper) objectInputStream.readObject();
+            new Thread(() -> handleResponse(message)).start();
     
         } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException | UnrecoverableKeyException | ClassNotFoundException e) {
             e.printStackTrace();

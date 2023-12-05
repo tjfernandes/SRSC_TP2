@@ -2,7 +2,7 @@ package org.example.utils;
 
 import java.util.UUID;
 
-public class Wrapper {
+public class Wrapper implements java.io.Serializable {
 
     private final byte messageType;
     private final byte[] message;
