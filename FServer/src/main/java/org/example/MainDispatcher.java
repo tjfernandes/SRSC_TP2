@@ -62,8 +62,8 @@ public class MainDispatcher {
 
         // Create a new thread for each module
         // new Thread(() -> initTLSClientSocket(ModuleName.STORAGE)).start();
-        // new Thread(() -> initTLSClientSocket(ModuleName.AUTHENTICATION)).start();
-        // new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
+        new Thread(() -> initTLSClientSocket(ModuleName.AUTHENTICATION)).start();
+        new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
     }
 
     private static void initTLSServerSocket() {
