@@ -1,15 +1,10 @@
 package org.example.utils;
 
-import org.example.RemoteFileSystemApp;
 import org.example.crypto.CryptoStuff;
 
 import javax.crypto.SecretKey;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
-import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
@@ -83,6 +78,7 @@ public class Login {
     public static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket) {
         ResponseAuthenticationMessage responseAuthenticationMessage = null;
         try {
+            System.out.println("ENTRA processAUthResponse");
             // Communication logic with the server
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
@@ -99,8 +95,8 @@ public class Login {
         return responseAuthenticationMessage;
     }
 
-    public static ResponseTGTMessage processTGSResponse(SSLSocket socket, byte[] encryptedTGT, SecretKey key) {
-        ResponseTGTMessage responseTGTMessage = null;
+    public static ResponseTGSMessage processTGSResponse(SSLSocket socket, SecretKey key) {
+        ResponseTGSMessage responseTGSMessage = null;
         try {
             // Communication logic with the server
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
@@ -110,11 +106,11 @@ public class Login {
             byte[] encryptedResponse = wrapper.getMessage();
             byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
 
-            responseTGTMessage = (ResponseTGTMessage) deserialize(decryptedResponse);
+            responseTGSMessage = (ResponseTGSMessage) deserialize(decryptedResponse);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return responseTGTMessage;
+        return responseTGSMessage;
     }
 
 

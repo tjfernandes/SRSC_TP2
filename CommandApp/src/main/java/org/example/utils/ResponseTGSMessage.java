@@ -4,7 +4,7 @@ import javax.crypto.SecretKey;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-public class ResponseTGTMessage implements Serializable {
+public class ResponseTGSMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final String serviceId;
@@ -12,7 +12,7 @@ public class ResponseTGTMessage implements Serializable {
     private final SecretKey sessionKey;
     private final byte[] sgt;
 
-    public ResponseTGTMessage(SecretKey sessionKey, String serviceId, LocalDateTime timestamp, byte[] sgt) {
+    public ResponseTGSMessage(SecretKey sessionKey, String serviceId, LocalDateTime timestamp, byte[] sgt) {
         this.serviceId = serviceId;
         this.timestamp = timestamp;
         this.sessionKey = sessionKey;

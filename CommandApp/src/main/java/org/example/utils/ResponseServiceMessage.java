@@ -2,11 +2,11 @@ package org.example.utils;
 
 import java.time.LocalDateTime;
 
-public class ResponseMessage {
+public class ResponseServiceMessage {
     private final LocalDateTime issueTimeReturn;
     private final CommandReturn commandReturn;
 
-    public ResponseMessage(CommandReturn commandReturn, LocalDateTime issueTimeReturn) {
+    public ResponseServiceMessage(CommandReturn commandReturn, LocalDateTime issueTimeReturn) {
         this.issueTimeReturn = LocalDateTime.now();
         this.commandReturn = commandReturn;
     }

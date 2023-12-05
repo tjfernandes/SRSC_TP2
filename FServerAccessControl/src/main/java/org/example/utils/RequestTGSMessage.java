@@ -2,7 +2,7 @@ package org.example.utils;
 
 import java.io.Serializable;
 
-public class RequestMessage implements Serializable {
+public class RequestTGSMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final byte[] tgt;
@@ -10,7 +10,7 @@ public class RequestMessage implements Serializable {
     private final byte[] authenticator;
 
 
-    public RequestMessage(byte[] tgt, String serviceId, byte[] authenticator) {
+    public RequestTGSMessage(byte[] tgt, String serviceId, byte[] authenticator) {
         this.tgt = tgt;
         this.serviceId = serviceId;
         this.authenticator = authenticator;

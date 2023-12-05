@@ -18,8 +18,8 @@ import org.example.crypto.CryptoStuff;
 import org.example.utils.Authenticator;
 import org.example.utils.Command;
 import org.example.utils.CommandReturn;
-import org.example.utils.RequestMessage;
-import org.example.utils.ResponseMessage;
+import org.example.utils.RequestServiceMessage;
+import org.example.utils.ResponseServiceMessage;
 import org.example.utils.ServiceGrantingTicket;
 import org.example.utils.Wrapper;
 
@@ -120,12 +120,12 @@ public class Main {
 
             // Reading the RequestMessage
             Wrapper wrapper = (Wrapper) objectInputStream.readObject();
-            RequestMessage requestMessage = (RequestMessage) deserialize(wrapper.getMessage());
+            RequestServiceMessage requestServiceMessage = (RequestServiceMessage) deserialize(wrapper.getMessage());
             byte messageType = wrapper.getMessageType();
             UUID messageId = wrapper.getMessageId();
 
             // Processing the RequestMessage
-            ResponseMessage response = processRequest(requestMessage, fsManager, crypto, key);
+            ResponseServiceMessage response = processRequest(requestServiceMessage, fsManager, crypto, key);
 
             byte[] encryptedResponse = crypto.encrypt(key, serialize(response));
 
@@ -146,17 +146,17 @@ public class Main {
         }
     }
 
-    private static ResponseMessage processRequest(RequestMessage requestMessage, FsManager fsManager,
-            CryptoStuff crypto, SecretKey key)
+    private static ResponseServiceMessage processRequest(RequestServiceMessage requestServiceMessage, FsManager fsManager,
+                                                         CryptoStuff crypto, SecretKey key)
             throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
 
         // Decrypting the Service Granting Ticket
-        byte[] encryptedsgt = requestMessage.getEncryptedSgt();
+        byte[] encryptedsgt = requestServiceMessage.getEncryptedSgt();
         byte[] sgtBytes = crypto.decrypt(key, encryptedsgt);
         ServiceGrantingTicket sgt = (ServiceGrantingTicket) deserialize(sgtBytes);
 
         // Decrypting the Authenticator
-        byte[] encryptedAuth = requestMessage.getAuthenticator();
+        byte[] encryptedAuth = requestServiceMessage.getAuthenticator();
         byte[] authBytes = crypto.decrypt(key, encryptedAuth);
         Authenticator authenticator = (Authenticator) deserialize(authBytes);
 
@@ -164,19 +164,19 @@ public class Main {
 
         // Checking if the Authenticator is valid
         if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
-            return new ResponseMessage(new CommandReturn(requestMessage.getCommand().getCommand(), 403), returnTime);
+            return new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime);
         }
 
-        Command command = requestMessage.getCommand();
+        Command command = requestServiceMessage.getCommand();
 
         // Checking if the command is valid
         if (!command.isValid()) {
-            return new ResponseMessage(new CommandReturn(requestMessage.getCommand().getCommand(), 403), returnTime);
+            return new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime);
         }
 
         CommandReturn commandReturn = processCommand(command, fsManager, CommandEnum.valueOf(command.getCommand()));
 
-        return new ResponseMessage(commandReturn, returnTime);
+        return new ResponseServiceMessage(commandReturn, returnTime);
     }
 
     private static SSLServerSocket server() {

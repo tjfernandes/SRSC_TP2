@@ -28,8 +28,8 @@ import javax.net.ssl.TrustManagerFactory;
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.utils.Authenticator;
-import org.example.utils.RequestMessage;
-import org.example.utils.ResponseMessage;
+import org.example.utils.RequestTGSMessage;
+import org.example.utils.ResponseTGSMessage;
 import org.example.utils.ServiceGrantingTicket;
 import org.example.utils.TicketGrantingTicket;
 import org.example.utils.Wrapper;
@@ -137,18 +137,18 @@ public class Main {
             System.out.println("Received message: " + wrapper);
 
             // deserialize request message
-            RequestMessage requestMessage = (RequestMessage) deserializeObject(wrapper.getMessage());
+            RequestTGSMessage requestTGSMessage = (RequestTGSMessage) deserializeObject(wrapper.getMessage());
 
-            String serviceId = requestMessage.getServiceId();
-            byte[] tgtSerialized = requestMessage.getTgt();
-            byte[] authenticatorSerialized = requestMessage.getAuthenticator();
+            String serviceId = requestTGSMessage.getServiceId();
+            byte[] tgtSerialized = requestTGSMessage.getTgt();
+            byte[] authenticatorSerialized = requestTGSMessage.getAuthenticator();
 
             // deserialize authenticator
             Authenticator authenticator = (Authenticator) deserializeObject(authenticatorSerialized);
 
             // decrypt and deserialize TGT
             CryptoStuff.getInstance();
-            tgtSerialized = CryptoStuff.decrypt(tgsKey, tgtSerialized);
+            tgtSerialized = CryptoStuff.getInstance().decrypt(tgsKey, tgtSerialized);
             TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(tgtSerialized);
             SecretKey keyClientTGS = convertStringToSecretKeyto(tgt.getKey());
 
@@ -170,12 +170,12 @@ public class Main {
 
             // serialize the ticket and encrypt it
             byte[] sgtSerialized = serializeObject(sgt);
-            sgtSerialized = CryptoStuff.encrypt(storageKey, sgtSerialized);
+            sgtSerialized = CryptoStuff.getInstance().encrypt(storageKey, sgtSerialized);
 
             // serialize and encrypt message
             byte[] msgSerialized = serializeObject(
-                    new ResponseMessage(keyClientTGS, serviceId, issueTime, sgtSerialized));
-            msgSerialized = CryptoStuff.encrypt(keyClientTGS, msgSerialized);
+                    new ResponseTGSMessage(keyClientTGS, serviceId, issueTime, sgtSerialized));
+            msgSerialized = CryptoStuff.getInstance().encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message
             Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, UUID.randomUUID());
