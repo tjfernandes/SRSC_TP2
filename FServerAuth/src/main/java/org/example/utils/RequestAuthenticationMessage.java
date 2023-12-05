@@ -4,7 +4,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-public class RequestMessage implements Serializable {
+public class RequestAuthenticationMessage implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -13,7 +13,7 @@ public class RequestMessage implements Serializable {
     private final String clientAddress;
     private final LocalDateTime timestamp;
 
-    public RequestMessage(String clientId, String clientAddress, String serviceId, LocalDateTime timestamp) {
+    public RequestAuthenticationMessage(String clientId, String clientAddress, String serviceId, LocalDateTime timestamp) {
         this.clientId = clientId;
         this.serviceId = serviceId;
         this.clientAddress = clientAddress;
@@ -34,5 +34,15 @@ public class RequestMessage implements Serializable {
 
     public LocalDateTime getTimestamp() {
         return timestamp;
+    }
+
+    @Override
+    public String toString() {
+        return "RequestAuthenticationMessage{" +
+                "clientId='" + clientId + '\'' +
+                ", serviceId='" + serviceId + '\'' +
+                ", clientAddress='" + clientAddress + '\'' +
+                ", timestamp=" + timestamp +
+                '}';
     }
 }

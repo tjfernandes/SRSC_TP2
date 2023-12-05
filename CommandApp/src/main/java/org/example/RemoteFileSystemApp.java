@@ -19,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.UUID;
 
 public class RemoteFileSystemApp {
@@ -44,7 +45,8 @@ public class RemoteFileSystemApp {
     private static final String CLIENT_ID = "client";
     private static final String CLIENT_ADDR = "127.0.0.1";
     private static final String SERVICE_ID = "storage";
-    private static final byte[] salt = {0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,0x0f, 0x0d, 0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04};;
+    private static final byte[] salt = {0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,0x0f, 0x0d, 0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04};
+    private static ResponseAuthenticationMessage responseAuthenticationMessage;
     private static ResponseTGSMessage responseTGSMessage;
 
 
@@ -217,20 +219,11 @@ public class RemoteFileSystemApp {
 
     private static void processLogin(SSLSocket socket) {
         try {
-
             // Handle auth
             Login.sendAuthRequest(socket);
-            ResponseAuthenticationMessage responseAuthenticationMessage = Login.processAuthResponse(socket);
+            responseAuthenticationMessage = Login.processAuthResponse(socket);
             byte[] encryptedTGT = responseAuthenticationMessage.getEncryptedTGT();
             SecretKey clientTGSKey = responseAuthenticationMessage.getGeneratedKey();
-
-            // Handle TGS
-            Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR);
-            byte[] authenticatorSerialized = serialize(authenticator);
-            Login.sendTGSRequest(socket, encryptedTGT, CryptoStuff.getInstance().encrypt(clientTGSKey, authenticatorSerialized));
-
-            responseTGSMessage = Login.processTGSResponse(socket, encryptedTGT, clientTGSKey);
-
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -239,6 +232,14 @@ public class RemoteFileSystemApp {
     private static CommandReturn requestCommand(SSLSocket socket,  String[] fullCommand, byte[] payload) {
         CommandReturn commandReturn = null;
         try {
+            // Handle TGS
+            Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR);
+            byte[] authenticatorSerialized = serialize(authenticator);
+            Login.sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
+                    CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized));
+
+            responseTGSMessage = Login.processTGSResponse(socket, responseTGSMessage.getSessionKey());
+
             Command command;
             ResponseServiceMessage responseServiceMessage;
             switch (fullCommand[0]) {

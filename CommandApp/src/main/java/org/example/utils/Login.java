@@ -78,6 +78,7 @@ public class Login {
     public static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket) {
         ResponseAuthenticationMessage responseAuthenticationMessage = null;
         try {
+            System.out.println("ENTRA processAUthResponse");
             // Communication logic with the server
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
@@ -94,7 +95,7 @@ public class Login {
         return responseAuthenticationMessage;
     }
 
-    public static ResponseTGSMessage processTGSResponse(SSLSocket socket, byte[] encryptedTGT, SecretKey key) {
+    public static ResponseTGSMessage processTGSResponse(SSLSocket socket, SecretKey key) {
         ResponseTGSMessage responseTGSMessage = null;
         try {
             // Communication logic with the server

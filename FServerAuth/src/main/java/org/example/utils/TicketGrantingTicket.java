@@ -24,7 +24,7 @@ public class TicketGrantingTicket implements Serializable {
         this.tgsServerIdentifier = tgsServerIdentifier;
         this.keyClientTGS = keyClientTGS;
         this.issueTime = LocalDateTime.now();
-        this.lifetime = Duration.ofHours(8);
+        this.lifetime = Duration.ofHours(2);
     }
 
     public String getClientAddress() {

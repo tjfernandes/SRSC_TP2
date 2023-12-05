@@ -11,7 +11,7 @@ import javax.crypto.SecretKey;
 import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
 
-public class ResponseMessage implements Serializable {
+public class ResponseAuthenticationMessage implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -20,7 +20,7 @@ public class ResponseMessage implements Serializable {
     private final Duration lifetime;
     private byte[] encryptedTGT;
 
-    public ResponseMessage(SecretKey generatedKey, byte[] encryptedTGT) {
+    public ResponseAuthenticationMessage(SecretKey generatedKey, byte[] encryptedTGT) {
         this.generatedKey = generatedKey;
         this.issueTime = LocalDateTime.now();
         this.lifetime = Duration.ofHours(8);

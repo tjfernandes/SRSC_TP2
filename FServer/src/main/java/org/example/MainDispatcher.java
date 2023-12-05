@@ -36,11 +36,11 @@ public class MainDispatcher {
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
             case STORAGE:
-                return new String[] { "localhost", "8083" };
+                return new String[] { "172.17.0.1", "8083" };
             case AUTHENTICATION:
-                return new String[] { "localhost", "8081" };
+                return new String[] { "172.17.0.1", "8081" };
             case ACCESS_CONTROL:
-                return new String[] { "localhost", "8082" };
+                return new String[] { "172.17.0.1", "8082" };
             default:
                 throw new IllegalArgumentException("Invalid module name");
         }
@@ -63,7 +63,7 @@ public class MainDispatcher {
         // Create a new thread for each module
         // new Thread(() -> initTLSClientSocket(ModuleName.STORAGE)).start();
         new Thread(() -> initTLSClientSocket(ModuleName.AUTHENTICATION)).start();
-        new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
+        //new Thread(() -> initTLSClientSocket(ModuleName.ACCESS_CONTROL)).start();
     }
 
     private static void initTLSServerSocket() {
@@ -132,17 +132,15 @@ public class MainDispatcher {
         byte type = request.getMessageType();
 
         // Choose the correct socket based on the message type
-        switch (type) {
-            case 1:
-                return socketMap.get(ModuleName.AUTHENTICATION);
-            case 3:
-                return socketMap.get(ModuleName.ACCESS_CONTROL);
-            case 6:
-                return socketMap.get(ModuleName.STORAGE);
-            default:
+        return switch (type) {
+            case 1 -> socketMap.get(ModuleName.AUTHENTICATION);
+            case 3 -> socketMap.get(ModuleName.ACCESS_CONTROL);
+            case 6 -> socketMap.get(ModuleName.STORAGE);
+            default -> {
                 System.out.println("Invalid message type: " + type);
-                return null;
-        }
+                yield null;
+            }
+        };
     }
 
     private static void handleResponse(Wrapper response) {

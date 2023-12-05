@@ -60,8 +60,22 @@ public class CryptoStuff {
     }
 
     public SecretKey convertStringToSecretKeyto(String encodedKey) {
-        byte[] decodedKey = Base64.getDecoder().decode(encodedKey);
+        byte[] decodedKey = hexToBytes(encodedKey);
+        System.out.println("BYTE KEY SIZE: " + decodedKey.length);
         SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
         return originalKey;
+    }
+
+    private byte[] hexToBytes(String hex) {
+        int len = hex.length();
+        byte[] ans = new byte[len / 2];
+
+        for (int i = 0; i < len; i += 2) {
+            // using left shift operator on every character
+            ans[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                    + Character.digit(hex.charAt(i+1), 16));
+        }
+
+        return ans;
     }
 }

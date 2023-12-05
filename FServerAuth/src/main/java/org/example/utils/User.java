@@ -24,13 +24,17 @@ public class User implements Serializable {
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));
         }
+
+        System.out.println("HEX KEY SIZE: " + sb.length());
         return sb.toString();
     }
+
 
     public String hashPassword(String password) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance(HASHING_ALGORITHMS);
         md.update(salt);
         byte[] bytes = md.digest(password.getBytes());
+        System.out.println("bytes key length: " + bytes.length);
         return bytesToHex(bytes);
     }
 
