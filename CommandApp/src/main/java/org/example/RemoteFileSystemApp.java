@@ -155,100 +155,10 @@ public class RemoteFileSystemApp {
             Login.sendTGSRequest(socket, encryptedTGT, CryptoStuff.getInstance().encrypt(clientTGSKey, authenticatorSerialized));
 
             ResponseTGTMessage responseTGTMessage = Login.processTGSResponse(socket, encryptedTGT, clientTGSKey);
+            responseTGTMessage.getSgt();
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private static void sendAuthRequest(SSLSocket socket) {
-        try {
-            // Communication logic with the server
-            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-
-            RequestAuthenticationMessage requestMessage = new RequestAuthenticationMessage(CLIENT_ID, CLIENT_ADDR, TGS_ID);
-
-            byte[] requestMessageSerialized = serialize(requestMessage);
-
-            // Create wrapper object with serialized request message for auth and its type
-            Wrapper wrapper = new Wrapper((byte) 1, requestMessageSerialized, UUID.randomUUID());
-
-            // Send wrapper to dispatcher
-            oos.writeObject(wrapper);
-            oos.flush();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void sendTGSRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator) {
-        try {
-            // Communication logic with the server
-            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-
-            RequestTGSMessage requestMessage = new RequestTGSMessage(SERVICE_ID, encryptedTGT, encryptedAuthenticator);
-
-            byte[] requestMessageSerialized = serialize(requestMessage);
-
-            // Create wrapper object with serialized request message for auth and its type
-            Wrapper wrapper = new Wrapper((byte) 1, requestMessageSerialized, UUID.randomUUID());
-
-            // Send wrapper to dispatcher
-            oos.writeObject(wrapper);
-            oos.flush();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void sendServiceRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator) {
-//        Req requestServiceMessage = null;
-//        try {
-//            // Communication logic with the server
-//            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-//
-//
-//
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-    }
-
-    private static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket) {
-        ResponseAuthenticationMessage responseAuthenticationMessage = null;
-        try {
-            // Communication logic with the server
-            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-
-            Wrapper wrapper = (Wrapper) ois.readObject();
-            byte[] encryptedResponse = wrapper.getMessage();
-
-            SecretKey clientKey = CryptoStuff.getInstance().convertStringToSecretKeyto(hashPassword(CLIENT_PASS));
-            byte[] descryptedResponse = CryptoStuff.getInstance().decrypt(clientKey, encryptedResponse);
-
-            responseAuthenticationMessage = (ResponseAuthenticationMessage) deserialize(descryptedResponse);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return responseAuthenticationMessage;
-    }
-
-    private static ResponseTGTMessage processTGSResponse(SSLSocket socket, byte[] encryptedTGT, SecretKey key) {
-        ResponseTGTMessage responseTGTMessage = null;
-        try {
-            // Communication logic with the server
-            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-
-            Wrapper wrapper = (Wrapper) ois.readObject();
-
-            byte[] encryptedResponse = wrapper.getMessage();
-            byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
-
-            responseTGTMessage = (ResponseTGTMessage) deserialize(decryptedResponse);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return responseTGTMessage;
     }
 
     private static byte[] serialize(Object object) throws IOException {
