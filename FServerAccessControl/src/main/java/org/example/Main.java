@@ -28,6 +28,7 @@ import javax.net.ssl.TrustManagerFactory;
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.utils.Authenticator;
+import org.example.utils.Command;
 import org.example.utils.RequestTGSMessage;
 import org.example.utils.ResponseTGSMessage;
 import org.example.utils.ServiceGrantingTicket;
@@ -56,6 +57,7 @@ public class Main {
     private static SecretKey storageKey;
 
     private static SSLServerSocket serverSocket;
+    private static AccessControl accessControl;
 
     public static void main(String[] args) {
         Properties props = new Properties();
@@ -70,6 +72,7 @@ public class Main {
         storageKey = convertStringToSecretKeyto(props.getProperty("STORAGE_KEY"));
 
         initTLSSocket();
+        accessControl = new AccessControl();
 
         while (true) {
             System.out.println("Server is listening on socket...");
@@ -141,18 +144,23 @@ public class Main {
             byte[] tgtSerialized = requestTGSMessage.getTgt();
             byte[] authenticatorSerialized = requestTGSMessage.getAuthenticator();
 
-            // deserialize authenticator
-            Authenticator authenticator = (Authenticator) deserializeObject(authenticatorSerialized);
-
             // decrypt and deserialize TGT
             CryptoStuff.getInstance();
             tgtSerialized = CryptoStuff.getInstance().decrypt(tgsKey, tgtSerialized);
             TicketGrantingTicket tgt = (TicketGrantingTicket) deserializeObject(tgtSerialized);
             SecretKey keyClientTGS = convertStringToSecretKeyto(tgt.getKey());
 
+            // decrypt and deserialize authenticator
+            authenticatorSerialized = CryptoStuff.getInstance().decrypt(keyClientTGS, authenticatorSerialized);
+            Authenticator authenticator = (Authenticator) deserializeObject(authenticatorSerialized);
+
             // check if authenticator is valid
             if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
                 System.out.println("Authenticator is not valid");
+                return;
+            }
+            if (!accessControl.hasPermission(authenticator.getClientId(), authenticator.getCommand().toString())) {
+                System.out.println("No permissions for this command");
                 return;
             }
 

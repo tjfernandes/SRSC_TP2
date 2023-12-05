@@ -1,31 +1,43 @@
 package org.example.utils;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
-public class Authenticator {
-    private final String userId;
-    private final String userAddress;
+public class Authenticator implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
+    private final String clientId;
+    private final String clientAddress;
     private final LocalDateTime timestamp;
+    private final Command command;
 
-    public Authenticator(String userId, String userAddress, LocalDateTime timestamp) {
-        this.userId = userId;
-        this.userAddress = userAddress;
-        this.timestamp = timestamp;
+    public Authenticator(String clientId, String clientAddress, Command command) {
+        this.clientId = clientId;
+        this.clientAddress = clientAddress;
+        timestamp = LocalDateTime.now();
+        this.command = command;
     }
 
-    public String getUserId() {
-        return userId;
+    public String getClientId() {
+        return clientId;
     }
 
-    public String getUserAddress() {
-        return userAddress;
+    public String getClientAddress() {
+        return clientAddress;
     }
 
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
 
+    public Command getCommand() {
+        return command;
+    }
+
     public boolean isValid(String userId, String userAddress) {
-        return this.userId.equals(userId) && this.userAddress.equals(userAddress);
+        return this.clientId.equals(userId) && this.clientAddress.equals(userAddress);
     }
 }
+
+
