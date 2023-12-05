@@ -50,6 +50,7 @@ public class Main {
 
     public static void main(String[] args) {
         Authentication authentication = new Authentication();
+        authentication.register("client", "12345");
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
 
@@ -95,10 +96,10 @@ public class Main {
 
             // Key to encrypt TGT
             String keyTGT = props.getProperty(TGS_KEY);
-            SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKeyto(keyTGT);
+            SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKey(keyTGT);
 
             // Key to encrypt response
-            String key = authentication.getUsernamePassword(requestMessage.getClientId());
+            byte[] key = authentication.getUsernamePassword(requestMessage.getClientId());
             SecretKey secretKey = CryptoStuff.getInstance().convertStringToSecretKeyto(key);
 
             // Encrypt TGT and send it to the client
