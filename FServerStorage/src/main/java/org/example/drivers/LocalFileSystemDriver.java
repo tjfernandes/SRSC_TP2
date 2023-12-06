@@ -7,6 +7,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -106,5 +107,17 @@ public class LocalFileSystemDriver {
             return 500;
         }
         return 204;
+    }
+
+    public Pair<BasicFileAttributes, Integer> fileMetadata(String path) {
+        try {
+            Path filePath = Path.of(path);
+            BasicFileAttributes attrs = Files.readAttributes(filePath, BasicFileAttributes.class);
+            return new Pair<>(attrs, 200);
+        } catch (NoSuchFileException e) {
+            return new Pair<>(null, 404);
+        } catch (IOException e) {
+            return new Pair<>(null, 500);
+        }
     }
 }

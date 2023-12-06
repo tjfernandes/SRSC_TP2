@@ -1,9 +1,12 @@
 package org.example;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 
 import org.example.drivers.DropboxDriver;
@@ -73,5 +76,26 @@ public class FsManager {
 
     public int cpCommand(String clientId, String sourcePath, String destinationPath) {
         return fs.copyFile(getFullPath(clientId, sourcePath), getFullPath(clientId, destinationPath));
+    }
+
+    public Pair<byte[], Integer> fileCommand(String clientId, String path) {
+        Pair<BasicFileAttributes, Integer> result = fs.fileMetadata(path);
+        BasicFileAttributes attrs = result.first;
+        Integer errorCode = result.second;
+
+        if (attrs != null) {
+            try {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                ObjectOutputStream oos = new ObjectOutputStream(bos);
+                oos.writeObject(attrs);
+                oos.flush();
+                byte[] data = bos.toByteArray();
+                return new Pair<>(data, errorCode);
+            } catch (IOException e) {
+                return new Pair<>(null, 500);
+            }
+        } else {
+            return new Pair<>(null, errorCode);
+        }
     }
 }

@@ -46,7 +46,7 @@ public class Main {
     public static final int KEYSIZE = 256;
 
     enum CommandEnum {
-        GET, PUT, RM, LS, MKDIR, CP
+        GET, PUT, RM, LS, MKDIR, CP, FILE
     }
 
     // Custom logger to print the timestamp in milliseconds
@@ -138,6 +138,11 @@ public class Main {
                 break;
             case CP:
                 code = fsManager.cpCommand(clientId, command.getPath(), command.getCpToPath());
+                break;
+            case FILE:
+                pair = fsManager.getCommand(clientId, command.getPath());
+                payload = pair.first;
+                code = pair.second;
                 break;
         }
 

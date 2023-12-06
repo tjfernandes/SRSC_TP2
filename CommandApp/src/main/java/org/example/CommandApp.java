@@ -12,8 +12,6 @@ import java.awt.event.*;
 import javax.crypto.KeyAgreement;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
-import javax.crypto.interfaces.DHPublicKey;
-import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
@@ -385,7 +383,7 @@ public class CommandApp {
                     break;
                 case "file":
                     // TODO - construtores do CommandApp não consistentes com o enunciado? ou
-                    // tripei?
+                    // tripei? o stor é que tripo assinado:rosa
                     break;
                 default:
                     throw new InvalidCommandException("Command '" + fullCommand[0] + "' is invalid");
@@ -448,7 +446,7 @@ public class CommandApp {
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
-            Authenticator authenticator = new Authenticator(command.getUsername(), CLIENT_ADDR, command);
+            Authenticator authenticator = new Authenticator(command.getUsername(), CLIENT_ADDR);
             byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(),
                     serialize(authenticator));
 
