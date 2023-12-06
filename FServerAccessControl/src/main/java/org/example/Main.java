@@ -10,8 +10,15 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.Properties;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -22,8 +29,6 @@ import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManagerFactory;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.utils.Authenticator;
@@ -58,9 +63,41 @@ public class Main {
     private static AccessControl accessControl;
 
 
-    private static final Logger logger = LogManager.getLogger(Main.class);
+    // Custom logger to print the timestamp in milliseconds
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
+    static {
+        try {
+            Logger rootLogger = Logger.getLogger("");
+            Handler[] handlers = rootLogger.getHandlers();
+            if (handlers[0] instanceof ConsoleHandler) {
+                rootLogger.removeHandler(handlers[0]);
+            }
+    
+            ConsoleHandler handler = new ConsoleHandler();
+            handler.setFormatter(new SimpleFormatter() {
+                private static final String format = "[%1$tT,%1$tL] [%2$-7s] [%3$s]: %4$s %n";
+    
+                @Override
+                public synchronized String format(LogRecord lr) {
+                    return String.format(format,
+                            new Date(lr.getMillis()),
+                            lr.getLevel().getLocalizedName(),
+                            lr.getLoggerName(),
+                            lr.getMessage()
+                    );
+                }
+            });
+            logger.addHandler(handler);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     public static void main(String[] args) {
+        // Set logger level
+        logger.setLevel(Level.SEVERE);
+
+
         Properties props = new Properties();
         try (FileInputStream input = new FileInputStream(KEYS_PATH)) {
             props.load(input);

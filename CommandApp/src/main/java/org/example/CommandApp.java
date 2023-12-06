@@ -1,8 +1,5 @@
 package org.example;
 
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
 import org.example.exceptions.IncorrectPasswordException;
@@ -25,7 +22,14 @@ import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Base64;
+import java.util.Date;
 import java.util.UUID;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class CommandApp {
 
@@ -52,10 +56,40 @@ public class CommandApp {
     private static ResponseAuthenticationMessage responseAuthenticationMessage = null;
     private static ResponseTGSMessage responseTGSMessage = null;
 
-    // Logger
-    private static final Logger logger = LogManager.getLogger(CommandApp.class);
+    // Custom logger to print the timestamp in milliseconds
+    private static final Logger logger = Logger.getLogger(CommandApp.class.getName());
+    static {
+        try {
+            Logger rootLogger = Logger.getLogger("");
+            Handler[] handlers = rootLogger.getHandlers();
+            if (handlers[0] instanceof ConsoleHandler) {
+                rootLogger.removeHandler(handlers[0]);
+            }
+    
+            ConsoleHandler handler = new ConsoleHandler();
+            handler.setFormatter(new SimpleFormatter() {
+                private static final String format = "[%1$tT,%1$tL] [%2$-7s] [%3$s]: %4$s %n";
+    
+                @Override
+                public synchronized String format(LogRecord lr) {
+                    return String.format(format,
+                            new Date(lr.getMillis()),
+                            lr.getLevel().getLocalizedName(),
+                            lr.getLoggerName(),
+                            lr.getMessage()
+                    );
+                }
+            });
+            logger.addHandler(handler);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     public static void main(String[] args) {
+        // Set the logger level
+        logger.setLevel(Level.SEVERE);
+
 
         JFrame frame = new JFrame("Remote FS");
         frame.setSize(800, 400);

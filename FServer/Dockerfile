@@ -8,6 +8,8 @@ COPY src/main/resources/dispatcher.cer dispatcher.cer
 COPY src/main/resources/authentication.cer authentication.cer
 COPY src/main/resources/access_control.cer access_control.cer
 COPY src/main/resources/storage.cer storage.cer
+COPY src src/
+COPY pom.xml pom.xml
 
 EXPOSE 8080
 

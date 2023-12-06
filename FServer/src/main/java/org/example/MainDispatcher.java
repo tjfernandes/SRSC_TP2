@@ -3,7 +3,6 @@ package org.example;
 import javax.net.ssl.*;
 
 import org.example.utils.Wrapper;
-import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.security.KeyManagementException;
@@ -13,11 +12,16 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import java.util.logging.Handler;
 
 public class MainDispatcher {
 
@@ -52,15 +56,45 @@ public class MainDispatcher {
     // A map from request IDs to client sockets
     private static Map<UUID, SSLSocket> clientSocketMap = new HashMap<>();
 
-    // Logger
-
-    private static final Logger logger = LogManager.getLogger(MainDispatcher.class);
-
-    public static void main(String[] args) throws Exception {
-         // Create a new thread to the client
-         new Thread(() -> initTLSServerSocket()).start();
-         System.out.println("Server started on port " + MY_PORT);
+    // Custom logger to print the timestamp in milliseconds
+    private static final Logger logger = Logger.getLogger(MainDispatcher.class.getName());
+    static {
+        try {
+            Logger rootLogger = Logger.getLogger("");
+            Handler[] handlers = rootLogger.getHandlers();
+            if (handlers[0] instanceof ConsoleHandler) {
+                rootLogger.removeHandler(handlers[0]);
+            }
+    
+            ConsoleHandler handler = new ConsoleHandler();
+            handler.setFormatter(new SimpleFormatter() {
+                private static final String format = "[%1$tT,%1$tL] [%2$-7s] [%3$s]: %4$s %n";
+    
+                @Override
+                public synchronized String format(LogRecord lr) {
+                    return String.format(format,
+                            new Date(lr.getMillis()),
+                            lr.getLevel().getLocalizedName(),
+                            lr.getLoggerName(),
+                            lr.getMessage()
+                    );
+                }
+            });
+            logger.addHandler(handler);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
+    
+    public static void main(String[] args) throws Exception {
+        // Set the log level
+        logger.setLevel(Level.SEVERE);
+
+       // Create a new thread to the client
+       new Thread(() -> initTLSServerSocket()).start();
+       System.out.println("Server started on port " + MY_PORT);
+    }
+
 
     private static void initTLSServerSocket() {
         try {
