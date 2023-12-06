@@ -7,7 +7,6 @@ public class Wrapper implements java.io.Serializable {
     private final byte messageType;
     private final byte[] message;
     private final UUID messageId;
-
     private final int status;
 
     public Wrapper(byte messageType, byte[] message, UUID messageId, int status) {

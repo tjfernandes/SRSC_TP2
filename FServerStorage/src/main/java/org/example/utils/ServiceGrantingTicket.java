@@ -58,4 +58,17 @@ public class ServiceGrantingTicket implements Serializable {
     public String getClientId() {
         return this.clientId;
     }
+
+    @Override
+    public String toString() {
+        return "ServiceGrantingTicket{" +
+                "clientId='" + clientId + '\'' +
+                ", clientAddress='" + clientAddress + '\'' +
+                ", serverIdentifier='" + serverIdentifier + '\'' +
+                ", keyClientServer=" + keyClientServer +
+                ", issueTime=" + issueTime +
+                ", lifetime=" + lifetime +
+                ", command=" + command +
+                '}';
+    }
 }
