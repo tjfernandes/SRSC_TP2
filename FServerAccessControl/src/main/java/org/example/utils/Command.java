@@ -1,6 +1,6 @@
 package org.example.utils;
 
-public class Command {
+public class Command implements java.io.Serializable {
     private final String command;
     private final String username;
     private final byte[] payload;
@@ -30,6 +30,10 @@ public class Command {
         this.payload = new byte[0];
         this.path = path;
         this.cpToPath = null;
+    }
+
+    public String getUsername() {
+        return username;
     }
 
 

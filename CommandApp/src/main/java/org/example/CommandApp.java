@@ -247,8 +247,11 @@ public class CommandApp {
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
-                    sendServiceRequest(socket, command);
+
+                    SSLSocket serviceSocket = initTLSSocket();
+                    sendServiceRequest(serviceSocket, command);
                     responseServiceMessage = processServiceResponse(socket);
+
                     commandReturn = responseServiceMessage.getcommandReturn();
 
                     break;
@@ -304,7 +307,9 @@ public class CommandApp {
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
+                    System.out.println("Sending service request");
                     sendServiceRequest(socket, command);
+                    System.out.println("Processing service response");
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
 
@@ -364,6 +369,7 @@ public class CommandApp {
 
     private static void sendServiceRequest(SSLSocket socket, Command command) {
         try {
+            System.out.println("Sending service request");
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
@@ -374,9 +380,10 @@ public class CommandApp {
             byte[] requestMessageSerialized = serialize(requestServiceMessage);
 
             // Create wrapper object with serialized request message for auth and its type
-            Wrapper wrapper = new Wrapper((byte) 1, requestMessageSerialized, UUID.randomUUID());
+            Wrapper wrapper = new Wrapper((byte) 6, requestMessageSerialized, UUID.randomUUID());
 
             // Send wrapper to dispatcher
+            System.out.println("Sending service request: " + wrapper);
             oos.writeObject(wrapper);
             oos.flush();
         } catch (Exception e) {
@@ -387,7 +394,6 @@ public class CommandApp {
     public static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket, String clientId, String password) throws IncorrectPasswordException, UserNotFoundException {
         ResponseAuthenticationMessage responseAuthenticationMessage = null;
         try {
-            System.out.println("ENTRA processAUthResponse");
             // Communication logic with the server
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
@@ -418,6 +424,7 @@ public class CommandApp {
     public static ResponseTGSMessage processTGSResponse(SSLSocket socket, SecretKey key) {
         ResponseTGSMessage responseTGSMessage = null;
         try {
+            System.out.println("Process TGS response");
             // Communication logic with the server
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
@@ -429,6 +436,7 @@ public class CommandApp {
             byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
 
             responseTGSMessage = (ResponseTGSMessage) deserialize(decryptedResponse);
+            System.out.println("Response TGS message: " + responseTGSMessage);
         } catch (Exception e) {
             e.printStackTrace();
         }

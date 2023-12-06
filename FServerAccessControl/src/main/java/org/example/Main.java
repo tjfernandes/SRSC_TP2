@@ -181,9 +181,10 @@ public class Main {
             msgSerialized = CryptoStuff.getInstance().encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message
-            Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, UUID.randomUUID());
+            Wrapper wrapperMessage = new Wrapper(wrapper.getMessageType(), msgSerialized, wrapper.getMessageId());
 
             // send wrapper message
+            System.out.println("Sending response: " + wrapperMessage);
             objectOutputStream.writeObject(wrapperMessage);
             objectOutputStream.flush();
 

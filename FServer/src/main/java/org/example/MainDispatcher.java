@@ -144,7 +144,6 @@ public class MainDispatcher {
                 System.out.println("No client socket for response: " + response);
                 return;
             }
-
             // Send the response back to the client
             ObjectOutputStream clientOutputStream = new ObjectOutputStream(clientSocket.getOutputStream());
             clientOutputStream.writeObject(response);
