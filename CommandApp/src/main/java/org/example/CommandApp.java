@@ -1,6 +1,8 @@
 package org.example;
 
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
 import org.example.exceptions.IncorrectPasswordException;
@@ -24,7 +26,6 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 import java.util.UUID;
-import java.util.logging.Logger;
 
 public class CommandApp {
 
@@ -53,7 +54,7 @@ public class CommandApp {
     private static ResponseTGSMessage responseTGSMessage = null;
 
     // Logger
-    private static final Logger logger = Logger.getLogger(CommandApp.class.getName());
+    private static final Logger logger = LogManager.getLogger(CommandApp.class);
 
     public static void main(String[] args) {
 

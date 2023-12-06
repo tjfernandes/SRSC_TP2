@@ -2,8 +2,8 @@ package org.example;
 
 import javax.net.ssl.*;
 
-import io.reactivex.internal.operators.observable.BlockingObservableIterable;
 import org.example.utils.Wrapper;
+import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.security.KeyManagementException;
@@ -16,7 +16,8 @@ import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class MainDispatcher {
 
@@ -52,7 +53,8 @@ public class MainDispatcher {
     private static Map<UUID, SSLSocket> clientSocketMap = new HashMap<>();
 
     // Logger
-    private static final Logger logger = Logger.getLogger(MainDispatcher.class.getName());
+
+    private static final Logger logger = LogManager.getLogger(MainDispatcher.class);
 
     public static void main(String[] args) throws Exception {
          // Create a new thread to the client

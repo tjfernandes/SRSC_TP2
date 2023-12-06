@@ -8,12 +8,13 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.logging.Logger;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
 import org.example.utils.Authenticator;
@@ -45,7 +46,7 @@ public class Main {
     }
 
     // Logger
-    private static final Logger logger = Logger.getLogger(Main.class.getName());
+    private static final Logger logger = LogManager.getLogger(Main.class);
 
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
