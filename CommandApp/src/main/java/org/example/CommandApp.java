@@ -46,7 +46,6 @@ public class CommandApp {
     private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
 
     private static final String TGS_ID = "access_control";
-    private static final String CLIENT_ID = "client";
     private static final String CLIENT_ADDR = "127.0.0.1";
     private static final String SERVICE_ID = "storage";
     private static final byte[] salt = {0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,0x0f, 0x0d, 0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04};
@@ -145,30 +144,34 @@ public class CommandApp {
                     response = "Command: " + command;
                     SSLSocket socket = initTLSSocket();
                     CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
+
                     byte[] payloadReceived = commandReturn.getPayload();
-                    String userHome = System.getProperty("user.home");
-                    String downloadsDir;
+                    if (payloadReceived.length > 0) {
+                        String userHome = System.getProperty("user.home");
+                        String downloadsDir;
 
-                    String fileName = UUID.randomUUID().toString();
+                        String fileName = UUID.randomUUID().toString();
 
-                    // Determine the default downloads directory based on the operating system
-                    String os = System.getProperty("os.name").toLowerCase();
-                    if (os.contains("win")) {
-                        downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
-                    } else if (os.contains("mac")) {
-                        downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
-                    } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-                        downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
-                    } else {
-                        downloadsDir = userHome + "/" + fileName; // For other systems
+                        // Determine the default downloads directory based on the operating system
+                        String os = System.getProperty("os.name").toLowerCase();
+                        if (os.contains("win")) {
+                            downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
+                        } else if (os.contains("mac")) {
+                            downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
+                        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+                            downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
+                        } else {
+                            downloadsDir = userHome + "/" + fileName; // For other systems
+                        }
+
+                        try(FileOutputStream fos = new FileOutputStream(downloadsDir)) {
+                            fos.write(payloadReceived);
+                            response = "File downloaded successfully to: " + downloadsDir;
+                        } catch (Exception ex) {
+                            response = "File wasn't successfully downloaded in dir: " + downloadsDir;
+                        }
                     }
 
-                    try(FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-                        fos.write(payloadReceived);
-                        response = "File downloaded successfully to: " + downloadsDir;
-                    } catch (Exception ex) {
-                        response = "File wasn't successfully downloaded in dir: " + downloadsDir;
-                    }
                 } else {
                     response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
                                 "Authenticate user with command: login username password";
@@ -244,7 +247,7 @@ public class CommandApp {
                         command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
                     }
                     // Request SGT from TGS
-                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
                     
                     authenticatorSerialized = serialize(authenticator);
                     sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(), CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
@@ -266,7 +269,7 @@ public class CommandApp {
                     command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2]);
 
                     // Request SGT from TGS
-                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
                     authenticatorSerialized = serialize(authenticator);
                     sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
                             CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
@@ -285,7 +288,7 @@ public class CommandApp {
                     command = new Command(fullCommand[0], fullCommand[1], fullCommand[1]);
 
                     // Request SGT from TGS
-                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
                     authenticatorSerialized = serialize(authenticator);
                     sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
                             CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
@@ -304,7 +307,7 @@ public class CommandApp {
                     command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2], fullCommand[3]);
 
                     // Request SGT from TGS
-                    authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
                     authenticatorSerialized = serialize(authenticator);
                     sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
                             CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
@@ -377,7 +380,7 @@ public class CommandApp {
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
-            Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+            Authenticator authenticator = new Authenticator(command.getUsername(), CLIENT_ADDR, command);
             byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(), serialize(authenticator));
 
             RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator);
@@ -495,13 +498,13 @@ public class CommandApp {
         return hash;
     }
 
-    private static String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
+//    private static String bytesToHex(byte[] bytes) {
+//        StringBuilder sb = new StringBuilder();
+//        for (byte b : bytes) {
+//            sb.append(String.format("%02x", b));
+//        }
+//        return sb.toString();
+//    }
 
 
 }
