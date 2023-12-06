@@ -5,12 +5,12 @@ import java.io.Serializable;
 public class RequestServiceMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private final byte[] Encryptedsgt;
+    private final byte[] encryptedSGT;
     private final byte[] authenticator;
     private final Command command;
 
-    public RequestServiceMessage(byte[] Encryptedsgt, byte[] authenticator, Command command) {
-        this.Encryptedsgt = Encryptedsgt;
+    public RequestServiceMessage(byte[] encryptedSGT, byte[] authenticator, Command command) {
+        this.encryptedSGT = encryptedSGT;
         this.authenticator = authenticator;
         this.command = command;
     }
@@ -19,8 +19,8 @@ public class RequestServiceMessage implements Serializable {
         return command;
     }
 
-    public byte[] getEncryptedSgt() {
-        return Encryptedsgt;
+    public byte[] getEncryptedSGT() {
+        return encryptedSGT;
     }
 
     public byte[] getAuthenticator() {

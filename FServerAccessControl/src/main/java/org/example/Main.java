@@ -72,11 +72,11 @@ public class Main {
             if (handlers[0] instanceof ConsoleHandler) {
                 rootLogger.removeHandler(handlers[0]);
             }
-    
+
             ConsoleHandler handler = new ConsoleHandler();
             handler.setFormatter(new SimpleFormatter() {
                 private static final String format = "[%1$tT,%1$tL] [%2$-7s] [%3$s]: %4$s %n";
-    
+
                 @Override
                 public synchronized String format(LogRecord lr) {
                     return String.format(format,
@@ -206,10 +206,10 @@ public class Main {
             KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
             kg.init(KEYSIZE);
             SecretKey generatedkey = kg.generateKey();
+            System.out.println("Generated key: " + generatedkey);
 
             // create ticket
-            ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId,
-                    generatedkey, null);
+            ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId, generatedkey);
             LocalDateTime issueTime = sgt.getIssueTime();
 
             // serialize the ticket and encrypt it
@@ -218,7 +218,7 @@ public class Main {
 
             // serialize and encrypt message
             byte[] msgSerialized = serializeObject(
-                    new ResponseTGSMessage(keyClientTGS, serviceId, issueTime, sgtSerialized));
+                    new ResponseTGSMessage(generatedkey, serviceId, issueTime, sgtSerialized));
             msgSerialized = CryptoStuff.getInstance().encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message

@@ -65,11 +65,11 @@ public class CommandApp {
             if (handlers[0] instanceof ConsoleHandler) {
                 rootLogger.removeHandler(handlers[0]);
             }
-    
+
             ConsoleHandler handler = new ConsoleHandler();
             handler.setFormatter(new SimpleFormatter() {
                 private static final String format = "[%1$tT,%1$tL] [%2$-7s] [%3$s]: %4$s %n";
-    
+
                 @Override
                 public synchronized String format(LogRecord lr) {
                     return String.format(format,
@@ -276,7 +276,7 @@ public class CommandApp {
                     if (fullCommand.length < 2 || fullCommand.length > 3)
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + " username path");
                     if (fullCommand.length == 2){
-                        command = new Command(fullCommand[0], fullCommand[1], null);
+                        command = new Command(fullCommand[0], fullCommand[1], "/");
                     } else {
                         command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
                     }
@@ -294,7 +294,6 @@ public class CommandApp {
                     responseServiceMessage = processServiceResponse(socket);
 
                     commandReturn = responseServiceMessage.getcommandReturn();
-
                     break;
                 case "put":
                     if (fullCommand.length != 3)
@@ -313,7 +312,6 @@ public class CommandApp {
                     sendServiceRequest(socket, command);
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
-
                     break;
                 case "get, rm":
                     if (fullCommand.length != 2)
@@ -348,9 +346,7 @@ public class CommandApp {
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
-                    System.out.println("Sending service request");
                     sendServiceRequest(socket, command);
-                    System.out.println("Processing service response");
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
 
@@ -410,21 +406,19 @@ public class CommandApp {
 
     private static void sendServiceRequest(SSLSocket socket, Command command) {
         try {
-            System.out.println("Sending service request");
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
             Authenticator authenticator = new Authenticator(command.getUsername(), CLIENT_ADDR, command);
             byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(), serialize(authenticator));
 
-            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator);
+            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator, command);
             byte[] requestMessageSerialized = serialize(requestServiceMessage);
 
             // Create wrapper object with serialized request message for auth and its type
             Wrapper wrapper = new Wrapper((byte) 6, requestMessageSerialized, UUID.randomUUID());
 
             // Send wrapper to dispatcher
-            System.out.println("Sending service request: " + wrapper);
             oos.writeObject(wrapper);
             oos.flush();
         } catch (Exception e) {
@@ -471,7 +465,7 @@ public class CommandApp {
 
             Wrapper wrapper = (Wrapper) ois.readObject();
 
-            int responseStatus = wrapper.getStatus();
+            //int responseStatus = wrapper.getStatus();
 
             byte[] encryptedResponse = wrapper.getMessage();
             byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);

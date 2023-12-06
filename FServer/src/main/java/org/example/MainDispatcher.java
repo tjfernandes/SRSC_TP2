@@ -65,11 +65,11 @@ public class MainDispatcher {
             if (handlers[0] instanceof ConsoleHandler) {
                 rootLogger.removeHandler(handlers[0]);
             }
-    
+
             ConsoleHandler handler = new ConsoleHandler();
             handler.setFormatter(new SimpleFormatter() {
                 private static final String format = "[%1$tT,%1$tL] [%2$-7s] [%3$s]: %4$s %n";
-    
+
                 @Override
                 public synchronized String format(LogRecord lr) {
                     return String.format(format,
@@ -85,7 +85,7 @@ public class MainDispatcher {
             e.printStackTrace();
         }
     }
-    
+
     public static void main(String[] args) throws Exception {
         // Set the log level
         logger.setLevel(Level.SEVERE);
@@ -94,7 +94,6 @@ public class MainDispatcher {
        new Thread(() -> initTLSServerSocket()).start();
        System.out.println("Server started on port " + MY_PORT);
     }
-
 
     private static void initTLSServerSocket() {
         try {

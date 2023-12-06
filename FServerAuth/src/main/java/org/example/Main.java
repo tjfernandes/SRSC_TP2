@@ -64,11 +64,11 @@ public class Main {
             if (handlers[0] instanceof ConsoleHandler) {
                 rootLogger.removeHandler(handlers[0]);
             }
-    
+
             ConsoleHandler handler = new ConsoleHandler();
             handler.setFormatter(new SimpleFormatter() {
                 private static final String format = "[%1$tT,%1$tL] [%2$-7s] [%3$s]: %4$s %n";
-    
+
                 @Override
                 public synchronized String format(LogRecord lr) {
                     return String.format(format,
@@ -134,7 +134,6 @@ public class Main {
             // Key to encrypt TGT
             String keyTGT = props.getProperty(TGS_KEY);
             SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKey(keyTGT);
-            System.out.println("TGS key: " + secretKeyTGT);
 
             // Key to encrypt response
             byte[] key = authentication.getUsernamePassword(requestAuthenticationMessage.getClientId());
