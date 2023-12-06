@@ -7,16 +7,10 @@ public class RequestServiceMessage implements Serializable {
 
     private final byte[] encryptedSGT;
     private final byte[] authenticator;
-    private final Command command;
 
-    public RequestServiceMessage(byte[] encryptedSGT, byte[] authenticator, Command command) {
+    public RequestServiceMessage(byte[] encryptedSGT, byte[] authenticator) {
         this.encryptedSGT = encryptedSGT;
         this.authenticator = authenticator;
-        this.command = command;
-    }
-
-    public Command getCommand() {
-        return command;
     }
 
     public byte[] getEncryptedSGT() {

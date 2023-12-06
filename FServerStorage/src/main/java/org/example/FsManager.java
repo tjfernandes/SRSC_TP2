@@ -4,99 +4,74 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-
-import org.example.crypto.CryptoException;
-import org.example.crypto.CryptoStuff;
 import org.example.drivers.DropboxDriver;
 import org.example.drivers.LocalFileSystemDriver;
+import org.example.utils.Pair;
 
+/*
+ * FsManager is a class that manages the file system and the Dropbox driver.
+ */
 public class FsManager {
 
-
-    private static final String ALGORITHM = "AES";
-    private static final int KEYSIZE = 256;
-
-    private CryptoStuff crypto;
     private LocalFileSystemDriver fs;
     private DropboxDriver dbx;
-    private SecretKey key;
 
-    private static final String FILESYSTEM_CONFIG_PATH = "/app/filesystem-config.properties";
     private static final String DROPBOXCONFIG_PATH = "/app/java/dropbox-config.properties";
+    private static final String FILESYSTEM_PATH = "/filesystem";
+
+    private static final String FULL_PATH_FORMAT_STRING = "%s/%s/%s";
 
     public FsManager() {
-        crypto = CryptoStuff.getInstance();
-        fs = new LocalFileSystemDriver(FILESYSTEM_CONFIG_PATH);
-        //dbx = new DropboxDriver(DROPBOXCONFIG_PATH);
-        try {
-            Files.createDirectories(Paths.get("/filesystem"));
+        fs = new LocalFileSystemDriver();
+        // dbx = new DropboxDriver(DROPBOXCONFIG_PATH);
 
-            KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
-            kg.init(KEYSIZE);
-            this.key = kg.generateKey();
-        } catch (NoSuchAlgorithmException | IOException e) {
+        try {
+            Files.createDirectories(Paths.get("FILESYSTEM_PATH"));
+
+            // Dummy client folder
+            Files.createDirectories(Paths.get("FILESYSTEM_PATH" + "/client"));
+
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public byte[] lsCommand(String path) {
-        List<String> fileList = fs.listFolder(path); 
-        if(fileList == null) {
-            return null;
+    private String getFullPath(String clientId, String path) {
+        return String.format(FULL_PATH_FORMAT_STRING, FILESYSTEM_PATH, clientId, path);
+    }
+
+    public Pair<byte[], Integer> lsCommand(String clientId, String path) {
+        Pair<List<String>, Integer> result = fs.listFolder(getFullPath(clientId, path));
+        List<String> list = result.first;
+        Integer errorCode = result.second;
+
+        if (list != null) {
+            byte[] fileArray = String.join("\n", list).getBytes(StandardCharsets.UTF_8);
+            return new Pair<>(fileArray, errorCode);
+        } else {
+            return new Pair<>(null, errorCode);
         }
-        String fileListString = String.join("\n", fileList);
-        return fileListString.getBytes(StandardCharsets.UTF_8);
     }
 
-    public boolean putCommand(String path, byte[] content) {
-        byte[] encryptedContent;
-    
-        try {
-            encryptedContent = crypto.encrypt(key, content);
-        } catch (CryptoException | InvalidAlgorithmParameterException e) {
-            e.printStackTrace();
-            return false;
-        }
-    
-        return fs.uploadFile(encryptedContent, path);
+    public int putCommand(String clientId, String path, byte[] content) {
+        return fs.uploadFile(content, getFullPath(clientId, path));
     }
 
-    public byte[] getCommand(String path) {
-        byte[] encryptedContent;
-    
-        encryptedContent = fs.downloadFile(path);
-    
-        if (encryptedContent == null) {
-            return null;
-        }
-
-        byte[] decryptedContent;
-    
-        try {
-            decryptedContent = crypto.decrypt(key, encryptedContent);
-        } catch (CryptoException | InvalidAlgorithmParameterException e) {
-            e.printStackTrace();
-            return null;
-        }
-    
-        return decryptedContent;
+    public Pair<byte[], Integer> getCommand(String clientId, String path) {
+        return fs.downloadFile(getFullPath(clientId, path));
     }
 
-    public boolean mkdirCommand(String path) {
-        return fs.createFolder(path);
+    public int mkdirCommand(String clientId, String path) {
+        return fs.createFolder(getFullPath(clientId, path));
     }
 
-    public boolean rmCommand(String path) {
-        return fs.deleteFile(path);
+    public int rmCommand(String clientId, String path) {
+        return fs.deleteFile(getFullPath(clientId, path));
     }
 
-    public boolean cpCommand(String sourcePath, String destinationPath) {
-        return fs.copyFile(sourcePath, destinationPath);
+    public int cpCommand(String clientId, String sourcePath, String destinationPath) {
+        return fs.copyFile(getFullPath(clientId, sourcePath), getFullPath(clientId, destinationPath));
     }
 }

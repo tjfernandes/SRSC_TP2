@@ -10,7 +10,7 @@ public class ResponseServiceMessage implements java.io.Serializable {
         this.issueTimeReturn = LocalDateTime.now();
         this.commandReturn = commandReturn;
     }
-    
+
     public CommandReturn getcommandReturn() {
         return commandReturn;
     }

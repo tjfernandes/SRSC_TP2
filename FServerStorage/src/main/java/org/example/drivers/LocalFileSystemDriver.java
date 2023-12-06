@@ -1,80 +1,70 @@
 package org.example.drivers;
 
 import java.io.*;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.stream.Stream;
 
+import org.example.utils.Pair;
+
 public class LocalFileSystemDriver {
-    private final String basePath;
 
-
-    public LocalFileSystemDriver(String configFilePath) {
-        Properties properties = loadProperties(configFilePath);
-        this.basePath = properties.getProperty("LOCAL_BASE_PATH");
+    public LocalFileSystemDriver() {
     }
 
-    private Properties loadProperties(String configFilePath) {
-        Properties properties = new Properties();
-        try (InputStream input = new FileInputStream(configFilePath)) {
-            properties.load(input);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return properties;
-    }
+    public int uploadFile(byte[] fileContent, String targetFilePath) {
+        try {
+            Path path = Paths.get(targetFilePath);
+            Files.createDirectories(path.getParent());
 
-    public boolean uploadFile(byte[] fileContent, String targetFilePath) {
-    try {
-        Path path = Paths.get(basePath + targetFilePath);
-        Files.createDirectories(path.getParent());
-
-        try (ByteArrayInputStream in = new ByteArrayInputStream(fileContent);
-             FileOutputStream out = new FileOutputStream(path.toString())) {
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
+            try (ByteArrayInputStream in = new ByteArrayInputStream(fileContent);
+                    FileOutputStream out = new FileOutputStream(path.toString())) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+            } catch (IOException e) {
+                return 500;
             }
         } catch (IOException e) {
-            return false;
+            return 500;
         }
-    } catch (IOException e) {
-        return false;
+        return 204;
     }
-    return true;
-}
 
-
-    public boolean createFolder(String path) {
-        Path folderPath = Path.of(basePath + path);
+    public int createFolder(String path) {
+        Path folderPath = Path.of(path);
         try {
             Files.createDirectories(folderPath);
-            System.out.println("Folder created: " + folderPath.toString());
+            return 204;
+        } catch (FileAlreadyExistsException e) {
+            return 409;
         } catch (IOException e) {
-          return false;
+            return 500;
         }
-        return true;
     }
 
-    public byte[] downloadFile(String filePath) {
+    public Pair<byte[], Integer> downloadFile(String filePath) {
         try {
-            Path sourcePath = Path.of(basePath + filePath);
-            return Files.readAllBytes(sourcePath);
+            Path sourcePath = Path.of(filePath);
+            return new Pair<>(Files.readAllBytes(sourcePath), 0);
+        } catch (NoSuchFileException e) {
+            return new Pair<>(null, 404);
         } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+            return new Pair<>(null, 500);
         }
     }
 
-    public List<String> listFolder(String path) {
+    public Pair<List<String>, Integer> listFolder(String path) {
         List<String> fileList = new ArrayList<>();
-        Path folderPath = Path.of(basePath + path);
+        Path folderPath = Path.of(path);
         try (Stream<Path> paths = Files.list(folderPath)) {
             paths.forEach(p -> {
                 String fileName = p.getFileName().toString();
@@ -84,33 +74,37 @@ public class LocalFileSystemDriver {
                     fileList.add(fileName);
                 }
             });
-            return fileList;
+
+            return new Pair<>(fileList, fileList.size() > 0 ? 200 : 204);
+        } catch (NoSuchFileException e) {
+            return new Pair<>(null, 404);
         } catch (IOException e) {
-            return null;
+            return new Pair<>(null, 500);
         }
     }
 
-    public boolean copyFile(String fromPath, String toPath) {
-        
+    public int copyFile(String fromPath, String toPath) {
         try {
-            Path sourcePath = Path.of(basePath + fromPath);
-            Path targetPath = Path.of(basePath + toPath);
+            Path sourcePath = Path.of(fromPath);
+            Path targetPath = Path.of(toPath);
             Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("File copied to: " + targetPath.toString());
+        } catch (NoSuchFileException e) {
+            return 404;
         } catch (IOException e) {
-            return false;
+            return 500;
         }
-
-        return true;
+        return 204;
     }
 
-    public boolean deleteFile(String path) {
+    public int deleteFile(String path) {
         try {
-            Path filePath = Path.of(basePath + path);
-            Files.deleteIfExists(filePath);
+            Path filePath = Path.of(path);
+            Files.delete(filePath);
+        } catch (NoSuchFileException e) {
+            return 404;
         } catch (IOException e) {
-            return false;
+            return 500;
         }
-        return true;
+        return 204;
     }
 }

@@ -10,13 +10,11 @@ public class Authenticator implements Serializable {
     private final String clientId;
     private final String clientAddress;
     private final LocalDateTime timestamp;
-    private final Command command;
 
-    public Authenticator(String clientId, String clientAddress, Command command) {
+    public Authenticator(String clientId, String clientAddress) {
         this.clientId = clientId;
         this.clientAddress = clientAddress;
         timestamp = LocalDateTime.now();
-        this.command = command;
     }
 
     public String getClientId() {
@@ -31,13 +29,7 @@ public class Authenticator implements Serializable {
         return timestamp;
     }
 
-    public Command getCommand() {
-        return command;
-    }
-
     public boolean isValid(String userId, String userAddress) {
         return this.clientId.equals(userId) && this.clientAddress.equals(userAddress);
     }
 }
-
-

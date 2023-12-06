@@ -5,7 +5,6 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Base64;
 import java.util.Date;
 import java.util.Properties;
 import java.util.UUID;
@@ -28,6 +27,7 @@ import org.example.utils.RequestServiceMessage;
 import org.example.utils.ResponseServiceMessage;
 import org.example.utils.ServiceGrantingTicket;
 import org.example.utils.Wrapper;
+import org.example.utils.Pair;
 
 public class Main {
 
@@ -69,8 +69,7 @@ public class Main {
                             new Date(lr.getMillis()),
                             lr.getLevel().getLocalizedName(),
                             lr.getLoggerName(),
-                            lr.getMessage()
-                    );
+                            lr.getMessage());
                 }
             });
             logger.addHandler(handler);
@@ -97,7 +96,6 @@ public class Main {
 
         // converting from String to SecretKey
         SecretKey key = crypto.convertStringToSecretKey(props.getProperty("STORAGE_TGS_KEY"));
-        System.out.println("Server started on port " + MY_PORT);
         while (true) {
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
@@ -110,39 +108,44 @@ public class Main {
         }
     }
 
-    public static CommandReturn processCommand(Command command, FsManager fsManager, CommandEnum commandEnum) {
+    // Process the command and returns the payload and the code
+    public static Pair<CommandReturn, Integer> processCommand(String clientId, Command command, FsManager fsManager,
+            CommandEnum commandEnum) {
+
         byte[] payload = null;
-        boolean ok = false;
+        int code = 0;
+        Pair<byte[], Integer> pair;
 
         switch (commandEnum) {
             case GET:
-                payload = fsManager.getCommand(command.getPath());
+                pair = fsManager.getCommand(clientId, command.getPath());
+                payload = pair.first;
+                code = pair.second;
                 break;
             case PUT:
-                ok = fsManager.putCommand(command.getPath(), command.getPayload());
+                code = fsManager.putCommand(clientId, command.getPath(), command.getPayload());
                 break;
             case RM:
-                ok = fsManager.rmCommand(command.getPath());
+                code = fsManager.rmCommand(clientId, command.getPath());
                 break;
             case LS:
-                payload = fsManager.lsCommand(command.getPath());
+                pair = fsManager.lsCommand(clientId, command.getPath());
+                code = pair.second;
+                payload = pair.first;
                 break;
             case MKDIR:
-                ok = fsManager.mkdirCommand(command.getPath());
+                code = fsManager.mkdirCommand(clientId, command.getPath());
                 break;
             case CP:
-                ok = fsManager.cpCommand(command.getPath(), command.getCpToPath());
+                code = fsManager.cpCommand(clientId, command.getPath(), command.getCpToPath());
                 break;
         }
 
-        if (ok)
-            return new CommandReturn(command.getCommand(), 200);
-        else if (payload != null)
-            return new CommandReturn(command.getCommand(), payload, 200);
-        else
-            return new CommandReturn(command.getCommand(), 400);
+        return new Pair<>(new CommandReturn(command, payload), code);
+
     }
 
+    // Handle the request
     private static void handleRequest(SSLSocket requestSocket, SSLServerSocket serverSocket, FsManager fsManager,
             CryptoStuff crypto, SecretKey key) {
         try {
@@ -157,10 +160,11 @@ public class Main {
             UUID messageId = wrapper.getMessageId();
 
             // Processing the RequestMessage
-            byte[] encryptedResponse = processRequest(requestServiceMessage, fsManager, crypto, key);
+            Pair<byte[], Integer> encryptedResponse = processRequest(requestServiceMessage, fsManager, crypto, key);
 
             // Create a new Wrapper object with the byte array
-            Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse, messageId);
+            Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse.first, messageId,
+                    encryptedResponse.second);
 
             // Sending the ResponseMessage
             objectOutputStream.writeObject(responseWrapper);
@@ -171,8 +175,10 @@ public class Main {
         }
     }
 
-    private static byte[] processRequest(RequestServiceMessage requestServiceMessage, FsManager fsManager,
-                                                         CryptoStuff crypto, SecretKey key)
+    // Process the request for a single request
+    private static Pair<byte[], Integer> processRequest(RequestServiceMessage requestServiceMessage,
+            FsManager fsManager,
+            CryptoStuff crypto, SecretKey key)
             throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
 
         // Decrypting the Service Granting Ticket
@@ -186,26 +192,31 @@ public class Main {
         Authenticator authenticator = (Authenticator) deserialize(authBytes);
 
         LocalDateTime returnTime = authenticator.getTimestamp().plusNanos(1);
-
+        Command command = sgt.getCommand();
         // Checking if the Authenticator is valid
         if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
-            return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime)));
+            return new Pair<>(crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(
+                    new CommandReturn(command), returnTime))), 400);
         }
-
-        Command command = requestServiceMessage.getCommand();
 
         // Checking if the command is valid
         if (!command.isValid()) {
-            return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime)));
+            return new Pair<>(crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(
+                    new CommandReturn(command), returnTime))), 400);
         }
 
-        CommandReturn commandReturn = processCommand(command, fsManager, CommandEnum.valueOf(command.getCommand().toUpperCase()));
+        String userId = sgt.getClientId();
 
-        return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(commandReturn, returnTime)));
+        Pair<CommandReturn, Integer> commandReturn = processCommand(userId, command, fsManager,
+                CommandEnum.valueOf(command.getCommand().toUpperCase()));
+
+        return new Pair<>(
+                crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(commandReturn.first, returnTime))),
+                commandReturn.second);
     }
 
+    // Create the server socket
     private static SSLServerSocket server() {
-
         try {
             // KeyStore
             KeyStore ks = KeyStore.getInstance("JKS");
@@ -235,6 +246,8 @@ public class Main {
         }
         return null;
     }
+
+    /* ---- Auxiliary method ---- */
 
     private static byte[] serialize(Object object) throws IOException {
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
