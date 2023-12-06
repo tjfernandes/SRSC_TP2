@@ -1,31 +1,39 @@
 package org.example.utils;
 
-public class CommandReturn implements java.io.Serializable {
-    private final String command;
-    private final byte[] payload;
-    private final int status;
+import java.io.Serial;
+import java.util.Arrays;
 
-    public CommandReturn(String command, byte[] payload, int status) {
+public class CommandReturn implements java.io.Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    private final Command command;
+    private final byte[] payload;
+
+    public CommandReturn(Command command, byte[] payload) {
         this.command = command;
         this.payload = payload;
-        this.status = status;
     }
 
-    public CommandReturn(String command, int status) {
+    public CommandReturn(Command command) {
         this.command = command;
         this.payload = new byte[0];
-        this.status = status;
     }
 
-    public int getStatus() {
-        return status;
-    }
-
-    public String getCommand() {
+    public Command getCommand() {
         return command;
     }
 
     public byte[] getPayload() {
         return payload;
+    }
+
+    @Override
+    public String toString() {
+        return "CommandReturn{" +
+                "command=" + command +
+                ", payload=" + (payload == null ? "null" : Arrays.toString(payload)) +
+                '}';
     }
 }

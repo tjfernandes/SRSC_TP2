@@ -54,7 +54,7 @@ public class FsManager {
             byte[] fileArray = String.join("\n", list).getBytes(StandardCharsets.UTF_8);
             return new Pair<>(fileArray, errorCode);
         } else {
-            return new Pair<>(null, errorCode);
+            return new Pair<>(new byte[0], errorCode);
         }
     }
 

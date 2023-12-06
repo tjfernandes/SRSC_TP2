@@ -30,7 +30,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.example.Main</mainClass>
+                            <mainClass>org.example.StorageService</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

@@ -1,8 +1,13 @@
 package org.example.utils;
 
+import java.io.Serial;
 import java.util.Arrays;
 
 public class CommandReturn implements java.io.Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final Command command;
     private final byte[] payload;
 

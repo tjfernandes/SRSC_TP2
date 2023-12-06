@@ -32,6 +32,8 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
@@ -51,7 +53,7 @@ public class CommandApp {
     public static final char[] TRUSTSTORE_PASSWORD = "client_truststore_password".toCharArray();
     public static final String TRUSTSTORE_PATH = "/truststore.jks";
     public static final String TLS_VERSION = "TLSv1.2";
-    public static final String DISPATCHER_HOST = "localhost";
+    public static final String DISPATCHER_HOST = "172.17.0.1";
     public static final int DISPATCHER_PORT = 8080;
 
     private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
@@ -61,9 +63,7 @@ public class CommandApp {
     private static final String SERVICE_ID = "storage";
     private static final byte[] salt = { 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00, 0x0f, 0x0d, 0x0e, 0x0c, 0x07,
             0x06, 0x05, 0x04 };
-    private static ResponseAuthenticationMessage responseAuthenticationMessage = null;
-    private static ResponseTGSMessage responseTGSMessage = null;
-    private static SecretKey dhKey = null;
+    private static Map<String, UserInfo> mapUsers;
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(CommandApp.class.getName());
@@ -97,6 +97,8 @@ public class CommandApp {
     public static void main(String[] args) {
         // Set the logger level
         logger.setLevel(Level.INFO);
+
+        mapUsers = new HashMap<>();
 
         JFrame frame = new JFrame("Remote FS");
         frame.setSize(800, 400);
@@ -170,61 +172,61 @@ public class CommandApp {
         requestButton.addActionListener(e -> {
             String command = commandTextField.getText();
             String[] fullCommand = command.split(" ");
-            String response = null;
-            if (fullCommand[0].equals("login")) {
-                if (fullCommand.length != 3)
-                    throw new InvalidCommandException("Command format should be: login username password");
-                try {
-                    dhKey = performDHKeyExchange(initTLSSocket());
-                    logger.info("DH key: " + dhKey);
-                } catch (InvalidKeyException | NoSuchAlgorithmException | InvalidAlgorithmParameterException
-                        | InvalidKeySpecException e1) {
-                    logger.warning("Error performing DH key exchange: " + e1.getMessage());
-                    e1.printStackTrace();
-                }
-                try {
-                    processLogin(initTLSSocket(), fullCommand[1], fullCommand[2]);
-                    response = "User '" + fullCommand[1] + "' authenticated with success!";
-                } catch (UserNotFoundException | IncorrectPasswordException ex) {
-                    response = ex.getMessage();
-                }
-            } else {
-                if (responseAuthenticationMessage != null) {
-                    response = "Command: " + command;
-                    SSLSocket socket = initTLSSocket();
-                    CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
-
-                    byte[] payloadReceived = commandReturn.getPayload();
-                    if (payloadReceived.length > 0) {
-                        String userHome = System.getProperty("user.home");
-                        String downloadsDir;
-
-                        String fileName = UUID.randomUUID().toString();
-
-                        // Determine the default downloads directory based on the operating system
-                        String os = System.getProperty("os.name").toLowerCase();
-                        if (os.contains("win")) {
-                            downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
-                        } else if (os.contains("mac")) {
-                            downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
-                        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-                            downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
-                        } else {
-                            downloadsDir = userHome + "/" + fileName; // For other systems
-                        }
-
-                        try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-                            fos.write(payloadReceived);
-                            response = "File downloaded successfully to: " + downloadsDir;
-                        } catch (Exception ex) {
-                            response = "File wasn't successfully downloaded in dir: " + downloadsDir;
-                        }
+            String response = "";
+            if (fullCommand.length > 1) {
+                String username = fullCommand[1];
+                mapUsers.putIfAbsent(username, new UserInfo());
+                if (fullCommand[0].equals("login")) {
+                    if (fullCommand.length != 3)
+                        throw new InvalidCommandException("Command format should be: login username password");
+                    try {
+                        mapUsers.get(username).setDhKey(performDHKeyExchange(initTLSSocket()));
+                    } catch (InvalidKeyException | NoSuchAlgorithmException | InvalidAlgorithmParameterException
+                            | InvalidKeySpecException e1) {
+                        logger.warning("Error performing DH key exchange: " + e1.getMessage());
+                        e1.printStackTrace();
                     }
-                    response = "Listing files: " + new String(commandReturn.getPayload());
-
+                    try {
+                        processLogin(initTLSSocket(), username, fullCommand[2]);
+                        response = "User '" + username + "' authenticated with success!";
+                    } catch (UserNotFoundException | IncorrectPasswordException ex) {
+                        response = ex.getMessage();
+                    }
                 } else {
-                    response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
-                            "Authenticate user with command: login username password";
+                    if (mapUsers.get(username).getTGT() != null) {
+                        SSLSocket socket = initTLSSocket();
+                        CommandReturn commandReturn = requestCommand(socket, fullCommand, payload[0]);
+
+                        byte[] payloadReceived = commandReturn.getPayload();
+                        if (payloadReceived.length > 0) {
+                            String userHome = System.getProperty("user.home");
+                            String downloadsDir;
+
+                            String fileName = UUID.randomUUID().toString();
+
+                            // Determine the default downloads directory based on the operating system
+                            String os = System.getProperty("os.name").toLowerCase();
+                            if (os.contains("win")) {
+                                downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
+                            } else if (os.contains("mac")) {
+                                downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
+                            } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+                                downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
+                            } else {
+                                downloadsDir = userHome + "/" + fileName; // For other systems
+                            }
+
+                            try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
+                                fos.write(payloadReceived);
+                                response = "File downloaded successfully to: " + downloadsDir;
+                            } catch (Exception ex) {
+                                response = "File wasn't successfully downloaded in dir: " + downloadsDir;
+                            }
+                        }
+                    } else {
+                        response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
+                                "Authenticate user with command: login username password";
+                    }
                 }
             }
             outputText.setText(response + "\n");
@@ -280,15 +282,17 @@ public class CommandApp {
         // Handle auth
         logger.severe("Starting authentication");
         sendAuthRequest(socket, clientId);
-        responseAuthenticationMessage = processAuthResponse(socket, clientId, password);
+        mapUsers.get(clientId).setTGT(processAuthResponse(socket, clientId, password));
     }
 
     private static CommandReturn requestCommand(SSLSocket socket, String[] fullCommand, byte[] payload) {
         CommandReturn commandReturn = null;
         Authenticator authenticator = null;
         byte[] authenticatorSerialized = null;
-        Command command;
+        Command command = null;
         ResponseServiceMessage responseServiceMessage;
+        String commandString = fullCommand[0];
+        String clientId = fullCommand[1];
         try {
             switch (fullCommand[0]) {
                 case "ls", "mkdir":
@@ -296,90 +300,31 @@ public class CommandApp {
                         throw new InvalidCommandException(
                                 "Command format should be: " + fullCommand[0] + " username path");
                     if (fullCommand.length == 2) {
-                        command = new Command(fullCommand[0], fullCommand[1], "/");
+                        command = new Command(fullCommand[0], clientId, "/");
                     } else {
-                        command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
+                        command = new Command(fullCommand[0], clientId, fullCommand[2]);
                     }
-                    // Request SGT from TGS
-                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
-
-                    authenticatorSerialized = serialize(authenticator);
-                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(), CryptoStuff.getInstance()
-                            .encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized),
-                            command);
-
-                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
-
-                    SSLSocket serviceSocket = initTLSSocket();
-                    sendServiceRequest(serviceSocket, command);
-                    responseServiceMessage = processServiceResponse(serviceSocket);
-
-                    commandReturn = responseServiceMessage.getcommandReturn();
                     break;
                 case "put":
                     if (fullCommand.length != 3)
                         throw new InvalidCommandException(
-                                "Command format should be: " + fullCommand[0] + "username path/file");
+                                "Command format should be: " + clientId + "username path/file");
 
-                    command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2]);
-
-                    // Request SGT from TGS
-                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
-                    authenticatorSerialized = serialize(authenticator);
-                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(),
-                                    authenticatorSerialized),
-                            command);
-
-                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
-
-                    sendServiceRequest(socket, command);
-                    responseServiceMessage = processServiceResponse(socket);
-                    commandReturn = responseServiceMessage.getcommandReturn();
+                    command = new Command(fullCommand[0], clientId, payload, fullCommand[2]);
                     break;
                 case "get, rm":
                     if (fullCommand.length != 2)
                         throw new InvalidCommandException(
                                 "Command format should be: " + fullCommand[0] + "username path/file");
 
-                    command = new Command(fullCommand[0], fullCommand[1], fullCommand[1]);
-
-                    // Request SGT from TGS
-                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
-                    authenticatorSerialized = serialize(authenticator);
-                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(),
-                                    authenticatorSerialized),
-                            command);
-
-                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
-
-                    sendServiceRequest(socket, command);
-                    responseServiceMessage = processServiceResponse(socket);
-                    commandReturn = responseServiceMessage.getcommandReturn();
-
+                    command = new Command(fullCommand[0], clientId, clientId);
                     break;
                 case "cp":
                     if (fullCommand.length != 4)
                         throw new InvalidCommandException(
                                 "Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
 
-                    command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2], fullCommand[3]);
-
-                    // Request SGT from TGS
-                    authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
-                    authenticatorSerialized = serialize(authenticator);
-                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(),
-                                    authenticatorSerialized),
-                            command);
-
-                    responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
-
-                    sendServiceRequest(socket, command);
-                    responseServiceMessage = processServiceResponse(socket);
-                    commandReturn = responseServiceMessage.getcommandReturn();
-
+                    command = new Command(fullCommand[0], clientId, payload, fullCommand[2], fullCommand[3]);
                     break;
                 case "file":
                     // TODO - construtores do CommandApp não consistentes com o enunciado? ou
@@ -388,6 +333,28 @@ public class CommandApp {
                 default:
                     throw new InvalidCommandException("Command '" + fullCommand[0] + "' is invalid");
             }
+            // Request SGT from TGS
+            authenticator = new Authenticator(clientId, CLIENT_ADDR, command);
+
+            authenticatorSerialized = serialize(authenticator);
+            ResponseAuthenticationMessage tgt = mapUsers.get(clientId).getTGT();
+            sendTGSRequest(socket, tgt.getEncryptedTGT(),
+                    CryptoStuff.getInstance()
+                            .encrypt(tgt.getGeneratedKey(),
+                                    authenticatorSerialized),
+                    command);
+
+            mapUsers.get(clientId).addSGT(commandString,
+                    processTGSResponse(socket, tgt.getGeneratedKey()));
+
+            SSLSocket serviceSocket = initTLSSocket();
+            ResponseTGSMessage sgt = mapUsers.get(clientId).getSGT(commandString);
+            sendServiceRequest(serviceSocket, command, sgt);
+            responseServiceMessage = processServiceResponse(serviceSocket,
+                    sgt);
+
+            commandReturn = responseServiceMessage.getcommandReturn();
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -403,10 +370,11 @@ public class CommandApp {
             RequestAuthenticationMessage requestMessage = new RequestAuthenticationMessage(clientId, CLIENT_ADDR,
                     TGS_ID);
 
-            byte[] requestMessageSerialized = serialize(requestMessage);
+            byte[] encryptedRequestMessge = CryptoStuff.getInstance().encrypt(mapUsers.get(clientId).getDhKey(),
+                    serialize(requestMessage));
 
             // Create wrapper object with serialized request message for auth and its type
-            Wrapper wrapper = new Wrapper((byte) 1, requestMessageSerialized, UUID.randomUUID());
+            Wrapper wrapper = new Wrapper((byte) 1, encryptedRequestMessge, UUID.randomUUID());
 
             // Send wrapper to dispatcher
             oos.writeObject(wrapper);
@@ -439,7 +407,7 @@ public class CommandApp {
         }
     }
 
-    private static void sendServiceRequest(SSLSocket socket, Command command) {
+    private static void sendServiceRequest(SSLSocket socket, Command command, ResponseTGSMessage sgt) {
         try {
             logger.severe("Sending Storage request command: " + command.getCommand() + " for client: "
                     + command.getUsername() + " to service: " + SERVICE_ID);
@@ -447,10 +415,11 @@ public class CommandApp {
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
             Authenticator authenticator = new Authenticator(command.getUsername(), CLIENT_ADDR);
-            byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(),
+            byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(
+                    sgt.getSessionKey(),
                     serialize(authenticator));
 
-            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(),
+            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(sgt.getSgt(),
                     encryptedAuthenticator, command);
             byte[] requestMessageSerialized = serialize(requestServiceMessage);
 
@@ -524,7 +493,8 @@ public class CommandApp {
         return responseTGSMessage;
     }
 
-    public static ResponseServiceMessage processServiceResponse(SSLSocket socket) {
+    public static ResponseServiceMessage processServiceResponse(SSLSocket socket,
+            ResponseTGSMessage responseTGSMessage) {
         logger.severe("Processing Storage response");
         ResponseServiceMessage responseServiceMessage = null;
         try {
@@ -553,8 +523,6 @@ public class CommandApp {
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
         keyPairGenerator.initialize(2048); // Adjust the key size as needed
         KeyPair keyPair = keyPairGenerator.generateKeyPair();
-        // DHParameterSpec dhParameterSpec = ((DHPublicKey)
-        // keyPair.getPublic()).getParams();
 
         // Generate public key and send it to the other endpoint
         byte[] publicKeyBytes = keyPair.getPublic().getEncoded();

@@ -29,7 +29,7 @@ import org.example.utils.ServiceGrantingTicket;
 import org.example.utils.Wrapper;
 import org.example.utils.Pair;
 
-public class Main {
+public class StorageService {
 
     public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
     public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
@@ -50,7 +50,7 @@ public class Main {
     }
 
     // Custom logger to print the timestamp in milliseconds
-    private static final Logger logger = Logger.getLogger(Main.class.getName());
+    private static final Logger logger = Logger.getLogger(StorageService.class.getName());
     static {
         try {
             Logger rootLogger = Logger.getLogger("");

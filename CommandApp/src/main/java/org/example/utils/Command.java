@@ -1,12 +1,18 @@
 package org.example.utils;
 
+import java.io.Serial;
+import java.util.Arrays;
+
 public class Command implements java.io.Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final String command;
     private final String username;
     private final byte[] payload;
     private final String path;
     private final String cpToPath;
-    
 
     public Command(String command, String username, byte[] payload, String path) {
         this.command = command;
@@ -54,5 +60,16 @@ public class Command implements java.io.Serializable {
 
     public boolean isValid() {
         return !(path.contains("../") || (cpToPath != null && cpToPath.contains("../")));
+    }
+
+    @Override
+    public String toString() {
+        return "Command{" +
+                "command='" + command + '\'' +
+                ", username='" + username + '\'' +
+                ", path='" + path + '\'' +
+                ", cpToPath='" + (cpToPath == null ? "null" : cpToPath) + '\'' +
+                ", payload=" + (payload == null ? "null" : Arrays.toString(payload)) +
+                '}';
     }
 }

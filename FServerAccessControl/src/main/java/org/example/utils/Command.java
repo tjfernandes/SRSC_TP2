@@ -1,8 +1,13 @@
 package org.example.utils;
 
+import java.io.Serial;
 import java.util.Arrays;
 
 public class Command implements java.io.Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final String command;
     private final String username;
     private final byte[] payload;

@@ -41,7 +41,7 @@ import org.example.utils.ResponseAuthenticationMessage;
 import org.example.utils.TicketGrantingTicket;
 import org.example.utils.Wrapper;
 
-public class Main {
+public class AuthenticationService {
 
     public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
     public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
@@ -61,9 +61,10 @@ public class Main {
 
     public static final int OK = 200;
     public static final int UNAUTHORIZED = 401;
+    private static SecretKey keyTGT = null;
 
     // Custom logger to print the timestamp in milliseconds
-    private static final Logger logger = Logger.getLogger(Main.class.getName());
+    private static final Logger logger = Logger.getLogger(AuthenticationService.class.getName());
     static {
         try {
             Logger rootLogger = Logger.getLogger("");
@@ -109,6 +110,7 @@ public class Main {
         Properties props = new Properties();
         try (FileInputStream input = new FileInputStream(TGS_KEY_PATH)) {
             props.load(input);
+            keyTGT = CryptoStuff.getInstance().convertStringToSecretKey(props.getProperty(TGS_KEY));
             while (true) {
                 SSLSocket socket = (SSLSocket) serverSocket.accept();
                 new Thread(() -> handleRequest(socket, authentication, props)).start();
@@ -195,9 +197,8 @@ public class Main {
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
 
             // Read the message from the client
-            RequestAuthenticationMessage requestAuthenticationMessage = (RequestAuthenticationMessage) deserialize(
-                    wrapper.getMessage());
-            byte messageType = wrapper.getMessageType();
+            byte[] decryptedMessage = CryptoStuff.getInstance().decrypt(dhKey, wrapper.getMessage());
+            RequestAuthenticationMessage request = (RequestAuthenticationMessage) deserialize(decryptedMessage);
             UUID uuid = wrapper.getMessageId();
 
             // Generate a key for client/tgs communication
@@ -206,29 +207,24 @@ public class Main {
             SecretKey generatedkey = kg.generateKey();
 
             // Create a TGT
-            TicketGrantingTicket tgt = new TicketGrantingTicket(requestAuthenticationMessage.getClientId(),
-                    requestAuthenticationMessage.getClientAddress(), requestAuthenticationMessage.getServiceId(),
-                    generatedkey);
+            TicketGrantingTicket tgt = new TicketGrantingTicket(request.getClientId(), request.getClientAddress(),
+                    request.getServiceId(), generatedkey);
             byte[] tgtBytes = serialize(tgt);
 
-            // Key to encrypt TGT
-            String keyTGT = props.getProperty(TGS_KEY);
-            SecretKey secretKeyTGT = CryptoStuff.getInstance().convertStringToSecretKey(keyTGT);
-
             // Key to encrypt response
-            byte[] key = authentication.getUsernamePassword(requestAuthenticationMessage.getClientId());
+            byte[] key = authentication.getUsernamePassword(request.getClientId());
             if (key == null) {
-                objectOutputStream.writeObject(new Wrapper(messageType, null, uuid, UNAUTHORIZED));
+                objectOutputStream.writeObject(new Wrapper((byte) 1, null, uuid, UNAUTHORIZED));
                 objectOutputStream.flush();
                 return;
             }
             SecretKey secretKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(key);
 
             // Encrypt TGT and send it to the client
-            byte[] encryptedTGT = CryptoStuff.getInstance().encrypt(secretKeyTGT, tgtBytes);
+            byte[] encryptedTGT = CryptoStuff.getInstance().encrypt(keyTGT, tgtBytes);
             byte[] responseBytes = serialize(new ResponseAuthenticationMessage(generatedkey, encryptedTGT));
             objectOutputStream.writeObject(
-                    new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid, OK));
+                    new Wrapper((byte) 1, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid, OK));
             objectOutputStream.flush();
 
         } catch (Exception e) {

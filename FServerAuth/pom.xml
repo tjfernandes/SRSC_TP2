@@ -17,7 +17,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.example.Main</mainClass>
+                            <mainClass>org.example.AuthenticationService</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
