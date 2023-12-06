@@ -24,6 +24,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 public class CommandApp {
 
@@ -51,6 +52,8 @@ public class CommandApp {
     private static ResponseAuthenticationMessage responseAuthenticationMessage = null;
     private static ResponseTGSMessage responseTGSMessage = null;
 
+    // Logger
+    private static final Logger logger = Logger.getLogger(CommandApp.class.getName());
 
     public static void main(String[] args) {
 

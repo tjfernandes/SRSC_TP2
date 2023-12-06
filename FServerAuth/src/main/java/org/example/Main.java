@@ -10,6 +10,7 @@ import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -48,6 +49,8 @@ public class Main {
     public static final int OK = 200;
     public static final int UNAUTHORIZED = 401;
 
+        // Logger
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
         Authentication authentication = new Authentication();

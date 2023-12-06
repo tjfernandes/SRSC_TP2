@@ -2,6 +2,7 @@ package org.example;
 
 import javax.net.ssl.*;
 
+import io.reactivex.internal.operators.observable.BlockingObservableIterable;
 import org.example.utils.Wrapper;
 
 import java.io.*;
@@ -15,6 +16,7 @@ import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 public class MainDispatcher {
 
@@ -49,11 +51,13 @@ public class MainDispatcher {
     // A map from request IDs to client sockets
     private static Map<UUID, SSLSocket> clientSocketMap = new HashMap<>();
 
-    public static void main(String[] args) throws Exception {
+    // Logger
+    private static final Logger logger = Logger.getLogger(MainDispatcher.class.getName());
 
-        // Create a new thread to the client
-        new Thread(() -> initTLSServerSocket()).start();
-        System.out.println("Server started on port " + MY_PORT);
+    public static void main(String[] args) throws Exception {
+         // Create a new thread to the client
+         new Thread(() -> initTLSServerSocket()).start();
+         System.out.println("Server started on port " + MY_PORT);
     }
 
     private static void initTLSServerSocket() {

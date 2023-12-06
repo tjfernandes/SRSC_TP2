@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -42,6 +43,9 @@ public class Main {
     enum CommandEnum {
         GET, PUT, RM, LS, MKDIR, CP
     }
+
+    // Logger
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
