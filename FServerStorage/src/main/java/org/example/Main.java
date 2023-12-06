@@ -7,7 +7,6 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.logging.Logger;
 
 import javax.crypto.SecretKey;
 import javax.net.ssl.*;
@@ -42,9 +41,6 @@ public class Main {
         GET, PUT, RM, LS, MKDIR, CP
     }
 
-    // Logger
-    private static final Logger logger = Logger.getLogger(Main.class.getName());
-
     public static void main(String[] args) {
         final SSLServerSocket serverSocket = server();
         FsManager fsManager = new FsManager();
@@ -60,7 +56,6 @@ public class Main {
 
         // converting from String to SecretKey
         SecretKey key = crypto.convertStringToSecretKey(props.getProperty("STORAGE_TGS_KEY"));
-        logger.info("SGT: " + key);
         System.out.println("Server started on port " + MY_PORT);
         while (true) {
             try {
@@ -140,14 +135,11 @@ public class Main {
             throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
 
         // Decrypting the Service Granting Ticket
-        logger.info("Decrypting the Service Granting Ticket");
         byte[] encryptedsgt = requestServiceMessage.getEncryptedSGT();
         byte[] sgtBytes = crypto.decrypt(key, encryptedsgt);
         ServiceGrantingTicket sgt = (ServiceGrantingTicket) deserialize(sgtBytes);
-        logger.info("key: " + sgt.getKey());
 
         // Decrypting the Authenticator
-        logger.info("Decrypting the Authenticator");
         byte[] encryptedAuth = requestServiceMessage.getAuthenticator();
         byte[] authBytes = crypto.decrypt(sgt.getKey(), encryptedAuth);
         Authenticator authenticator = (Authenticator) deserialize(authBytes);
@@ -156,7 +148,6 @@ public class Main {
 
         // Checking if the Authenticator is valid
         if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
-            logger.info("Authenticator is not valid");
             return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime)));
         }
 
@@ -164,7 +155,6 @@ public class Main {
 
         // Checking if the command is valid
         if (!command.isValid()) {
-            logger.info("Command is not valid");
             return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime)));
         }
 

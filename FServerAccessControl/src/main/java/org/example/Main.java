@@ -12,8 +12,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Enumeration;
 import java.util.Properties;
-import java.util.logging.Logger;
-
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManagerFactory;
@@ -36,8 +34,6 @@ import java.security.cert.Certificate;
 import java.time.LocalDateTime;
 
 public class Main {
-
-    private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
     public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
@@ -175,7 +171,6 @@ public class Main {
 
             // serialize the ticket and encrypt it
             byte[] sgtSerialized = serializeObject(sgt);
-            logger.info("SGT: " + storageKey);
             sgtSerialized = CryptoStuff.getInstance().encrypt(storageKey, sgtSerialized);
 
             // serialize and encrypt message
