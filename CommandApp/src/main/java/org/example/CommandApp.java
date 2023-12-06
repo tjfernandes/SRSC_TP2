@@ -238,7 +238,7 @@ public class CommandApp {
                     if (fullCommand.length < 2 || fullCommand.length > 3)
                         throw new InvalidCommandException("Command format should be: " + fullCommand[0] + " username path");
                     if (fullCommand.length == 2){
-                        command = new Command(fullCommand[0], fullCommand[1], null);
+                        command = new Command(fullCommand[0], fullCommand[1], "/");
                     } else {
                         command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
                     }
@@ -256,7 +256,7 @@ public class CommandApp {
                     responseServiceMessage = processServiceResponse(socket);
 
                     commandReturn = responseServiceMessage.getcommandReturn();
-
+                    logger.info("Command return: " + commandReturn);
                     break;
                 case "put":
                     if (fullCommand.length != 3)
@@ -275,7 +275,6 @@ public class CommandApp {
                     sendServiceRequest(socket, command);
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
-
                     break;
                 case "get, rm":
                     if (fullCommand.length != 2)
@@ -310,9 +309,7 @@ public class CommandApp {
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
-                    System.out.println("Sending service request");
                     sendServiceRequest(socket, command);
-                    System.out.println("Processing service response");
                     responseServiceMessage = processServiceResponse(socket);
                     commandReturn = responseServiceMessage.getcommandReturn();
 
@@ -372,21 +369,22 @@ public class CommandApp {
 
     private static void sendServiceRequest(SSLSocket socket, Command command) {
         try {
-            System.out.println("Sending service request");
+            logger.info("Sending service request");
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
             Authenticator authenticator = new Authenticator(CLIENT_ID, CLIENT_ADDR, command);
+            logger.info("Session key: " + responseTGSMessage.getSessionKey());
             byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(), serialize(authenticator));
 
-            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator);
+            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator, command);
             byte[] requestMessageSerialized = serialize(requestServiceMessage);
 
             // Create wrapper object with serialized request message for auth and its type
             Wrapper wrapper = new Wrapper((byte) 6, requestMessageSerialized, UUID.randomUUID());
 
             // Send wrapper to dispatcher
-            System.out.println("Sending service request: " + wrapper);
+            logger.info("Sending service request: " + wrapper);
             oos.writeObject(wrapper);
             oos.flush();
         } catch (Exception e) {
@@ -449,6 +447,7 @@ public class CommandApp {
     public static ResponseServiceMessage processServiceResponse(SSLSocket socket) {
         ResponseServiceMessage responseServiceMessage = null;
         try {
+            logger.info("Processing service response");
             // Communication logic with the server
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 

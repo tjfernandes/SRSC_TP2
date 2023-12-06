@@ -149,6 +149,7 @@ public class MainDispatcher {
                 return;
             }
             // Send the response back to the client
+            logger.info("Sending back response: " + response);
             ObjectOutputStream clientOutputStream = new ObjectOutputStream(clientSocket.getOutputStream());
             clientOutputStream.writeObject(response);
             clientOutputStream.flush();

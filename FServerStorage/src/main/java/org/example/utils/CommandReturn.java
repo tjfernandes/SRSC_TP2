@@ -1,6 +1,6 @@
 package org.example.utils;
 
-public class CommandReturn {
+public class CommandReturn implements java.io.Serializable {
     private final String command;
     private final byte[] payload;
     private final int status;

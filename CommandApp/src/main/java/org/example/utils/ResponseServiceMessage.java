@@ -2,7 +2,7 @@ package org.example.utils;
 
 import java.time.LocalDateTime;
 
-public class ResponseServiceMessage {
+public class ResponseServiceMessage implements java.io.Serializable {
     private final LocalDateTime issueTimeReturn;
     private final CommandReturn commandReturn;
 

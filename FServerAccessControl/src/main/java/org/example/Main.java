@@ -12,7 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Enumeration;
 import java.util.Properties;
-import java.util.UUID;
+import java.util.logging.Logger;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -36,6 +36,8 @@ import java.security.cert.Certificate;
 import java.time.LocalDateTime;
 
 public class Main {
+
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
     public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
@@ -165,19 +167,20 @@ public class Main {
             KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
             kg.init(KEYSIZE);
             SecretKey generatedkey = kg.generateKey();
+            System.out.println("Generated key: " + generatedkey);
 
             // create ticket
-            ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId,
-                    generatedkey, null);
+            ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId, generatedkey);
             LocalDateTime issueTime = sgt.getIssueTime();
 
             // serialize the ticket and encrypt it
             byte[] sgtSerialized = serializeObject(sgt);
+            logger.info("SGT: " + storageKey);
             sgtSerialized = CryptoStuff.getInstance().encrypt(storageKey, sgtSerialized);
 
             // serialize and encrypt message
             byte[] msgSerialized = serializeObject(
-                    new ResponseTGSMessage(keyClientTGS, serviceId, issueTime, sgtSerialized));
+                    new ResponseTGSMessage(generatedkey, serviceId, issueTime, sgtSerialized));
             msgSerialized = CryptoStuff.getInstance().encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message

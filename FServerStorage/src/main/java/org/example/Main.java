@@ -5,13 +5,11 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Base64;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.logging.Logger;
 
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
 
 import org.example.crypto.CryptoException;
@@ -61,8 +59,8 @@ public class Main {
         }
 
         // converting from String to SecretKey
-        SecretKey key = convertStringToSecretKeyto(props.getProperty("STORAGE_TGS_KEY"));
-
+        SecretKey key = crypto.convertStringToSecretKey(props.getProperty("STORAGE_TGS_KEY"));
+        logger.info("SGT: " + key);
         System.out.println("Server started on port " + MY_PORT);
         while (true) {
             try {
@@ -74,12 +72,6 @@ public class Main {
                 e.printStackTrace();
             }
         }
-    }
-
-    public static SecretKey convertStringToSecretKeyto(String encodedKey) {
-        byte[] decodedKey = Base64.getDecoder().decode(encodedKey);
-        SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
-        return originalKey;
     }
 
     public static CommandReturn processCommand(Command command, FsManager fsManager, CommandEnum commandEnum) {
@@ -129,9 +121,7 @@ public class Main {
             UUID messageId = wrapper.getMessageId();
 
             // Processing the RequestMessage
-            ResponseServiceMessage response = processRequest(requestServiceMessage, fsManager, crypto, key);
-
-            byte[] encryptedResponse = crypto.encrypt(key, serialize(response));
+            byte[] encryptedResponse = processRequest(requestServiceMessage, fsManager, crypto, key);
 
             // Create a new Wrapper object with the byte array
             Wrapper responseWrapper = new Wrapper(messageType, encryptedResponse, messageId);
@@ -140,47 +130,47 @@ public class Main {
             objectOutputStream.writeObject(responseWrapper);
             objectOutputStream.flush();
 
-            // // Closing the streams
-            // objectOutputStream.close();
-            // objectInputStream.close();
-            // requestSocket.close();
-
         } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | CryptoException e) {
             e.printStackTrace();
         }
     }
 
-    private static ResponseServiceMessage processRequest(RequestServiceMessage requestServiceMessage, FsManager fsManager,
+    private static byte[] processRequest(RequestServiceMessage requestServiceMessage, FsManager fsManager,
                                                          CryptoStuff crypto, SecretKey key)
             throws IOException, ClassNotFoundException, InvalidAlgorithmParameterException, CryptoException {
 
         // Decrypting the Service Granting Ticket
-        byte[] encryptedsgt = requestServiceMessage.getEncryptedSgt();
+        logger.info("Decrypting the Service Granting Ticket");
+        byte[] encryptedsgt = requestServiceMessage.getEncryptedSGT();
         byte[] sgtBytes = crypto.decrypt(key, encryptedsgt);
         ServiceGrantingTicket sgt = (ServiceGrantingTicket) deserialize(sgtBytes);
+        logger.info("key: " + sgt.getKey());
 
         // Decrypting the Authenticator
+        logger.info("Decrypting the Authenticator");
         byte[] encryptedAuth = requestServiceMessage.getAuthenticator();
-        byte[] authBytes = crypto.decrypt(key, encryptedAuth);
+        byte[] authBytes = crypto.decrypt(sgt.getKey(), encryptedAuth);
         Authenticator authenticator = (Authenticator) deserialize(authBytes);
 
-        LocalDateTime returnTime = authenticator.getTimestamp().plusHours(1);
+        LocalDateTime returnTime = authenticator.getTimestamp().plusNanos(1);
 
         // Checking if the Authenticator is valid
         if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
-            return new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime);
+            logger.info("Authenticator is not valid");
+            return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime)));
         }
 
         Command command = requestServiceMessage.getCommand();
 
         // Checking if the command is valid
         if (!command.isValid()) {
-            return new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime);
+            logger.info("Command is not valid");
+            return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(new CommandReturn(requestServiceMessage.getCommand().getCommand(), 403), returnTime)));
         }
 
-        CommandReturn commandReturn = processCommand(command, fsManager, CommandEnum.valueOf(command.getCommand()));
+        CommandReturn commandReturn = processCommand(command, fsManager, CommandEnum.valueOf(command.getCommand().toUpperCase()));
 
-        return new ResponseServiceMessage(commandReturn, returnTime);
+        return crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(commandReturn, returnTime)));
     }
 
     private static SSLServerSocket server() {
