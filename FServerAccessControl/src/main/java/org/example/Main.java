@@ -32,6 +32,7 @@ import javax.net.ssl.TrustManagerFactory;
 import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.utils.Authenticator;
+import org.example.utils.Command;
 import org.example.utils.RequestTGSMessage;
 import org.example.utils.ResponseTGSMessage;
 import org.example.utils.ServiceGrantingTicket;
@@ -62,7 +63,6 @@ public class Main {
     private static SSLServerSocket serverSocket;
     private static AccessControl accessControl;
 
-
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(Main.class.getName());
     static {
@@ -83,8 +83,7 @@ public class Main {
                             new Date(lr.getMillis()),
                             lr.getLevel().getLocalizedName(),
                             lr.getLoggerName(),
-                            lr.getMessage()
-                    );
+                            lr.getMessage());
                 }
             });
             logger.addHandler(handler);
@@ -96,7 +95,6 @@ public class Main {
     public static void main(String[] args) {
         // Set logger level
         logger.setLevel(Level.SEVERE);
-
 
         Properties props = new Properties();
         try (FileInputStream input = new FileInputStream(KEYS_PATH)) {
@@ -123,7 +121,6 @@ public class Main {
                 e.printStackTrace();
             }
         }
-
     }
 
     private static void initTLSSocket() {
@@ -194,11 +191,24 @@ public class Main {
 
             // check if authenticator is valid
             if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
-                System.out.println("Authenticator is not valid");
-                return;
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(), 401);
+                objectOutputStream.writeObject(errorWrapper);
+                objectOutputStream.flush();
+                objectOutputStream.close();
+                objectInputStream.close();
+                requestSocket.close();
             }
-            if (!accessControl.hasPermission(authenticator.getClientId(), authenticator.getCommand().toString())) {
-                System.out.println("No permissions for this command");
+
+            Command command = authenticator.getCommand();
+
+            // check if the user has permissions for this command
+            if (!accessControl.hasPermission(authenticator.getClientId(), command.getCommand())) {
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(), 401);
+                objectOutputStream.writeObject(errorWrapper);
+                objectOutputStream.flush();
+                objectOutputStream.close();
+                objectInputStream.close();
+                requestSocket.close();
                 return;
             }
 
@@ -206,10 +216,10 @@ public class Main {
             KeyGenerator kg = KeyGenerator.getInstance(ALGORITHM);
             kg.init(KEYSIZE);
             SecretKey generatedkey = kg.generateKey();
-            System.out.println("Generated key: " + generatedkey);
 
             // create ticket
-            ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId, generatedkey);
+            ServiceGrantingTicket sgt = new ServiceGrantingTicket(tgt.getClientId(), tgt.getClientAddress(), serviceId,
+                    generatedkey, command);
             LocalDateTime issueTime = sgt.getIssueTime();
 
             // serialize the ticket and encrypt it
@@ -222,10 +232,9 @@ public class Main {
             msgSerialized = CryptoStuff.getInstance().encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message
-            Wrapper wrapperMessage = new Wrapper(wrapper.getMessageType(), msgSerialized, wrapper.getMessageId());
+            Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, wrapper.getMessageId(), 204);
 
             // send wrapper message
-            System.out.println("Sending response: " + wrapperMessage);
             objectOutputStream.writeObject(wrapperMessage);
             objectOutputStream.flush();
 
@@ -239,6 +248,8 @@ public class Main {
             e.printStackTrace();
         }
     }
+
+    /* ---- Auxiliary methods ---- */
 
     private static byte[] serializeObject(Object object) {
         try {

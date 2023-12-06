@@ -19,6 +19,13 @@ public class Authenticator implements Serializable {
         this.command = command;
     }
 
+    public Authenticator(String clientId, String clientAddress) {
+        this.clientId = clientId;
+        this.clientAddress = clientAddress;
+        timestamp = LocalDateTime.now();
+        this.command = null;
+    }
+
     public String getClientId() {
         return clientId;
     }
@@ -38,6 +45,14 @@ public class Authenticator implements Serializable {
     public boolean isValid(String userId, String userAddress) {
         return this.clientId.equals(userId) && this.clientAddress.equals(userAddress);
     }
+
+    @Override
+    public String toString() {
+        return "Authenticator{" +
+                "clientId='" + clientId + '\'' +
+                ", clientAddress='" + clientAddress + '\'' +
+                ", timestamp=" + timestamp +
+                ", command=" + (command == null ? "null" : command.toString()) +
+                '}';
+    }
 }
-
-

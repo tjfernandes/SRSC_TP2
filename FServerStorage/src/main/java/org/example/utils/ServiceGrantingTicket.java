@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 import javax.crypto.SecretKey;
 
-public class ServiceGrantingTicket implements Serializable{
+public class ServiceGrantingTicket implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -18,14 +18,21 @@ public class ServiceGrantingTicket implements Serializable{
     private final SecretKey keyClientServer;
     private final LocalDateTime issueTime;
     private final Duration lifetime;
+    private final Command command;
 
-    public ServiceGrantingTicket(String clientId, String clientAddress, String serverIdentifier, SecretKey keyClientServer) {
+    public ServiceGrantingTicket(String clientId, String clientAddress, String serverIdentifier,
+            SecretKey keyClientServer, Command command) {
         this.clientId = clientId;
         this.clientAddress = clientAddress;
         this.serverIdentifier = serverIdentifier;
         this.keyClientServer = keyClientServer;
         this.issueTime = LocalDateTime.now();
-        this.lifetime = Duration.ofMinutes(5); // TGT validity period
+        this.lifetime = Duration.ofMinutes(5);
+        this.command = command;
+    }
+
+    public Command getCommand() {
+        return command;
     }
 
     public String getClientAddress() {
@@ -50,5 +57,18 @@ public class ServiceGrantingTicket implements Serializable{
 
     public String getClientId() {
         return this.clientId;
+    }
+
+    @Override
+    public String toString() {
+        return "ServiceGrantingTicket{" +
+                "clientId='" + clientId + '\'' +
+                ", clientAddress='" + clientAddress + '\'' +
+                ", serverIdentifier='" + serverIdentifier + '\'' +
+                ", keyClientServer=" + keyClientServer +
+                ", issueTime=" + issueTime +
+                ", lifetime=" + lifetime +
+                ", command=" + command +
+                '}';
     }
 }
