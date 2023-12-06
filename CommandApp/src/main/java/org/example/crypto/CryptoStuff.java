@@ -13,16 +13,15 @@ public class CryptoStuff {
 
     private static CryptoStuff instance;
 
-    private static final byte[] ivBytes  = new byte[]
-     {
-	    0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,
-        0x0f, 0x0d, 0x0e, 0x0c
-     };
+    private static final byte[] ivBytes = new byte[] {
+            0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
+            0x0f, 0x0d, 0x0e, 0x0c
+    };
 
     private GCMParameterSpec gcmParameterSpec;
 
     private CryptoStuff() {
-      gcmParameterSpec = new GCMParameterSpec(128, ivBytes);
+        gcmParameterSpec = new GCMParameterSpec(128, ivBytes);
     }
 
     public static CryptoStuff getInstance() {
@@ -40,16 +39,17 @@ public class CryptoStuff {
         return doCrypto(Cipher.DECRYPT_MODE, key, inputBytes);
     }
 
-    private byte[]  doCrypto(int cipherMode, Key key, byte[] inputBytes)
+    private byte[] doCrypto(int cipherMode, Key key, byte[] inputBytes)
             throws CryptoException, InvalidAlgorithmParameterException {
         try {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            
+
             cipher.init(cipherMode, key, gcmParameterSpec);
 
             return cipher.doFinal(inputBytes);
 
-        } catch ( BadPaddingException | IllegalBlockSizeException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException ex) {
+        } catch (BadPaddingException | IllegalBlockSizeException | NoSuchAlgorithmException | NoSuchPaddingException
+                | InvalidKeyException ex) {
             throw new CryptoException("Error encrypting/decrypting data" + ex.getMessage());
         }
     }
@@ -73,7 +73,7 @@ public class CryptoStuff {
         for (int i = 0; i < len; i += 2) {
             // using left shift operator on every character
             ans[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-                    + Character.digit(hex.charAt(i+1), 16));
+                    + Character.digit(hex.charAt(i + 1), 16));
         }
 
         return ans;

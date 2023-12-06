@@ -8,19 +8,31 @@ import org.example.exceptions.UserNotFoundException;
 import org.example.utils.*;
 
 import java.awt.event.*;
+
+import javax.crypto.KeyAgreement;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
+import javax.crypto.interfaces.DHPublicKey;
+import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 import java.util.UUID;
 import java.util.logging.ConsoleHandler;
@@ -32,28 +44,28 @@ import java.util.logging.SimpleFormatter;
 
 public class CommandApp {
 
-    public static final String[] CONFPROTOCOLS     = {"TLSv1.2"};
-    public static final String[] CONFCIPHERSUITES  = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
-    public static final String KEYSTORE_TYPE       = "JKS";
-    public static final String KEYSTORE_PASSWORD   = "client_password";
-    public static final String KEYSTORE_PATH       = "/keystore.jks";
-    public static final String TRUSTSTORE_TYPE     = "JKS";
+    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };
+    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
+    public static final String KEYSTORE_TYPE = "JKS";
+    public static final String KEYSTORE_PASSWORD = "client_password";
+    public static final String KEYSTORE_PATH = "/keystore.jks";
+    public static final String TRUSTSTORE_TYPE = "JKS";
     public static final char[] TRUSTSTORE_PASSWORD = "client_truststore_password".toCharArray();
-    public static final String TRUSTSTORE_PATH     = "/truststore.jks";
-    public static final String TLS_VERSION         = "TLSv1.2";
-    public static final String DISPATCHER_HOST     = "localhost";
-    public static final int DISPATCHER_PORT        = 8080;
-
-
+    public static final String TRUSTSTORE_PATH = "/truststore.jks";
+    public static final String TLS_VERSION = "TLSv1.2";
+    public static final String DISPATCHER_HOST = "localhost";
+    public static final int DISPATCHER_PORT = 8080;
 
     private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
 
     private static final String TGS_ID = "access_control";
     private static final String CLIENT_ADDR = "127.0.0.1";
     private static final String SERVICE_ID = "storage";
-    private static final byte[] salt = {0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 ,0x0f, 0x0d, 0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04};
+    private static final byte[] salt = { 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00, 0x0f, 0x0d, 0x0e, 0x0c, 0x07,
+            0x06, 0x05, 0x04 };
     private static ResponseAuthenticationMessage responseAuthenticationMessage = null;
     private static ResponseTGSMessage responseTGSMessage = null;
+    private static SecretKey dhKey = null;
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(CommandApp.class.getName());
@@ -75,8 +87,7 @@ public class CommandApp {
                             new Date(lr.getMillis()),
                             lr.getLevel().getLocalizedName(),
                             lr.getLoggerName(),
-                            lr.getMessage()
-                    );
+                            lr.getMessage());
                 }
             });
             logger.addHandler(handler);
@@ -87,8 +98,7 @@ public class CommandApp {
 
     public static void main(String[] args) {
         // Set the logger level
-        logger.setLevel(Level.SEVERE);
-
+        logger.setLevel(Level.INFO);
 
         JFrame frame = new JFrame("Remote FS");
         frame.setSize(800, 400);
@@ -135,7 +145,8 @@ public class CommandApp {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // Implement file submission logic here
-                // This could involve opening a file chooser dialog and processing the selected file
+                // This could involve opening a file chooser dialog and processing the selected
+                // file
                 // For example:
                 JFileChooser fileChooser = new JFileChooser();
                 int result = fileChooser.showOpenDialog(null);
@@ -165,9 +176,16 @@ public class CommandApp {
             if (fullCommand[0].equals("login")) {
                 if (fullCommand.length != 3)
                     throw new InvalidCommandException("Command format should be: login username password");
-                SSLSocket socket = initTLSSocket();
                 try {
-                    processLogin(socket, fullCommand[1], fullCommand[2]);
+                    dhKey = performDHKeyExchange(initTLSSocket());
+                    logger.info("DH key: " + dhKey);
+                } catch (InvalidKeyException | NoSuchAlgorithmException | InvalidAlgorithmParameterException
+                        | InvalidKeySpecException e1) {
+                    logger.warning("Error performing DH key exchange: " + e1.getMessage());
+                    e1.printStackTrace();
+                }
+                try {
+                    processLogin(initTLSSocket(), fullCommand[1], fullCommand[2]);
                     response = "User '" + fullCommand[1] + "' authenticated with success!";
                 } catch (UserNotFoundException | IncorrectPasswordException ex) {
                     response = ex.getMessage();
@@ -197,7 +215,7 @@ public class CommandApp {
                             downloadsDir = userHome + "/" + fileName; // For other systems
                         }
 
-                        try(FileOutputStream fos = new FileOutputStream(downloadsDir)) {
+                        try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
                             fos.write(payloadReceived);
                             response = "File downloaded successfully to: " + downloadsDir;
                         } catch (Exception ex) {
@@ -208,7 +226,7 @@ public class CommandApp {
 
                 } else {
                     response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
-                                "Authenticate user with command: login username password";
+                            "Authenticate user with command: login username password";
                 }
             }
             outputText.setText(response + "\n");
@@ -235,7 +253,8 @@ public class CommandApp {
 
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(CommandApp.class.getResourceAsStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD);
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
             // Set up the SSLContext
@@ -258,14 +277,15 @@ public class CommandApp {
         return socket;
     }
 
-    private static void processLogin(SSLSocket socket, String clientId, String password) throws UserNotFoundException, IncorrectPasswordException {
+    private static void processLogin(SSLSocket socket, String clientId, String password)
+            throws UserNotFoundException, IncorrectPasswordException {
         // Handle auth
         logger.severe("Starting authentication");
         sendAuthRequest(socket, clientId);
         responseAuthenticationMessage = processAuthResponse(socket, clientId, password);
     }
 
-    private static CommandReturn requestCommand(SSLSocket socket,  String[] fullCommand, byte[] payload) {
+    private static CommandReturn requestCommand(SSLSocket socket, String[] fullCommand, byte[] payload) {
         CommandReturn commandReturn = null;
         Authenticator authenticator = null;
         byte[] authenticatorSerialized = null;
@@ -275,20 +295,22 @@ public class CommandApp {
             switch (fullCommand[0]) {
                 case "ls", "mkdir":
                     if (fullCommand.length < 2 || fullCommand.length > 3)
-                        throw new InvalidCommandException("Command format should be: " + fullCommand[0] + " username path");
-                    if (fullCommand.length == 2){
+                        throw new InvalidCommandException(
+                                "Command format should be: " + fullCommand[0] + " username path");
+                    if (fullCommand.length == 2) {
                         command = new Command(fullCommand[0], fullCommand[1], "/");
                     } else {
                         command = new Command(fullCommand[0], fullCommand[1], fullCommand[2]);
                     }
                     // Request SGT from TGS
                     authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
-                    
+
                     authenticatorSerialized = serialize(authenticator);
-                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(), CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+                    sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(), CryptoStuff.getInstance()
+                            .encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized),
+                            command);
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
-
 
                     SSLSocket serviceSocket = initTLSSocket();
                     sendServiceRequest(serviceSocket, command);
@@ -298,7 +320,8 @@ public class CommandApp {
                     break;
                 case "put":
                     if (fullCommand.length != 3)
-                        throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path/file");
+                        throw new InvalidCommandException(
+                                "Command format should be: " + fullCommand[0] + "username path/file");
 
                     command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2]);
 
@@ -306,7 +329,9 @@ public class CommandApp {
                     authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
                     authenticatorSerialized = serialize(authenticator);
                     sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(),
+                                    authenticatorSerialized),
+                            command);
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
@@ -316,7 +341,8 @@ public class CommandApp {
                     break;
                 case "get, rm":
                     if (fullCommand.length != 2)
-                        throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path/file");
+                        throw new InvalidCommandException(
+                                "Command format should be: " + fullCommand[0] + "username path/file");
 
                     command = new Command(fullCommand[0], fullCommand[1], fullCommand[1]);
 
@@ -324,7 +350,9 @@ public class CommandApp {
                     authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
                     authenticatorSerialized = serialize(authenticator);
                     sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(),
+                                    authenticatorSerialized),
+                            command);
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
@@ -335,7 +363,8 @@ public class CommandApp {
                     break;
                 case "cp":
                     if (fullCommand.length != 4)
-                        throw new InvalidCommandException("Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
+                        throw new InvalidCommandException(
+                                "Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
 
                     command = new Command(fullCommand[0], fullCommand[1], payload, fullCommand[2], fullCommand[3]);
 
@@ -343,7 +372,9 @@ public class CommandApp {
                     authenticator = new Authenticator(fullCommand[1], CLIENT_ADDR, command);
                     authenticatorSerialized = serialize(authenticator);
                     sendTGSRequest(socket, responseAuthenticationMessage.getEncryptedTGT(),
-                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(), authenticatorSerialized), command);
+                            CryptoStuff.getInstance().encrypt(responseAuthenticationMessage.getGeneratedKey(),
+                                    authenticatorSerialized),
+                            command);
 
                     responseTGSMessage = processTGSResponse(socket, responseAuthenticationMessage.getGeneratedKey());
 
@@ -353,7 +384,8 @@ public class CommandApp {
 
                     break;
                 case "file":
-                    // TODO - construtores do CommandApp não consistentes com o enunciado? ou tripei?
+                    // TODO - construtores do CommandApp não consistentes com o enunciado? ou
+                    // tripei?
                     break;
                 default:
                     throw new InvalidCommandException("Command '" + fullCommand[0] + "' is invalid");
@@ -370,7 +402,8 @@ public class CommandApp {
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
-            RequestAuthenticationMessage requestMessage = new RequestAuthenticationMessage(clientId, CLIENT_ADDR, TGS_ID);
+            RequestAuthenticationMessage requestMessage = new RequestAuthenticationMessage(clientId, CLIENT_ADDR,
+                    TGS_ID);
 
             byte[] requestMessageSerialized = serialize(requestMessage);
 
@@ -385,9 +418,11 @@ public class CommandApp {
         }
     }
 
-    public static void sendTGSRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator, Command command) {
+    public static void sendTGSRequest(SSLSocket socket, byte[] encryptedTGT, byte[] encryptedAuthenticator,
+            Command command) {
         try {
-            logger.severe("Sending TGS request command: " + command.getCommand() + " for client: " + command.getUsername() + " to service: " + SERVICE_ID);
+            logger.severe("Sending TGS request command: " + command.getCommand() + " for client: "
+                    + command.getUsername() + " to service: " + SERVICE_ID);
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
@@ -408,14 +443,17 @@ public class CommandApp {
 
     private static void sendServiceRequest(SSLSocket socket, Command command) {
         try {
-            logger.severe("Sending Storage request command: " + command.getCommand() + " for client: " + command.getUsername() + " to service: " + SERVICE_ID);
+            logger.severe("Sending Storage request command: " + command.getCommand() + " for client: "
+                    + command.getUsername() + " to service: " + SERVICE_ID);
             // Communication logic with the server
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
             Authenticator authenticator = new Authenticator(command.getUsername(), CLIENT_ADDR, command);
-            byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(), serialize(authenticator));
+            byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(responseTGSMessage.getSessionKey(),
+                    serialize(authenticator));
 
-            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(), encryptedAuthenticator, command);
+            RequestServiceMessage requestServiceMessage = new RequestServiceMessage(responseTGSMessage.getSgt(),
+                    encryptedAuthenticator, command);
             byte[] requestMessageSerialized = serialize(requestServiceMessage);
 
             // Create wrapper object with serialized request message for auth and its type
@@ -429,7 +467,8 @@ public class CommandApp {
         }
     }
 
-    public static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket, String clientId, String password) throws IncorrectPasswordException, UserNotFoundException {
+    public static ResponseAuthenticationMessage processAuthResponse(SSLSocket socket, String clientId, String password)
+            throws IncorrectPasswordException, UserNotFoundException {
         logger.severe("Processing auth response for client: " + clientId);
         ResponseAuthenticationMessage responseAuthenticationMessage = null;
         try {
@@ -442,7 +481,8 @@ public class CommandApp {
                 case 200:
                     byte[] encryptedResponse = wrapper.getMessage();
                     try {
-                        SecretKey clientKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(hashPassword(password));
+                        SecretKey clientKey = CryptoStuff.getInstance()
+                                .convertByteArrayToSecretKey(hashPassword(password));
                         byte[] descryptedResponse = CryptoStuff.getInstance().decrypt(clientKey, encryptedResponse);
                         responseAuthenticationMessage = (ResponseAuthenticationMessage) deserialize(descryptedResponse);
                     } catch (CryptoException e) {
@@ -454,7 +494,8 @@ public class CommandApp {
                 default:
                     break;
             }
-        } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+        } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | NoSuchAlgorithmException
+                | InvalidKeySpecException e) {
             e.printStackTrace();
         }
         return responseAuthenticationMessage;
@@ -471,7 +512,7 @@ public class CommandApp {
             Wrapper wrapper = (Wrapper) ois.readObject();
 
             logger.info("Attempting to decrypt TGS response");
-            //int responseStatus = wrapper.getStatus();
+            // int responseStatus = wrapper.getStatus();
             byte[] encryptedResponse = wrapper.getMessage();
             byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
 
@@ -505,11 +546,68 @@ public class CommandApp {
         return responseServiceMessage;
     }
 
+    private static SecretKey performDHKeyExchange(SSLSocket socket)
+            throws NoSuchAlgorithmException,
+            InvalidAlgorithmParameterException, InvalidKeyException, InvalidKeySpecException {
 
+        logger.severe("Performing DH key exchange");
+        // Generate DH parameters
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
+        keyPairGenerator.initialize(2048); // Adjust the key size as needed
+        KeyPair keyPair = keyPairGenerator.generateKeyPair();
+        // DHParameterSpec dhParameterSpec = ((DHPublicKey)
+        // keyPair.getPublic()).getParams();
+
+        // Generate public key and send it to the other endpoint
+        byte[] publicKeyBytes = keyPair.getPublic().getEncoded();
+
+        try {
+            logger.info("Trying to start outstream");
+            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+
+            logger.info("Sending public key to server");
+            Wrapper request = new Wrapper((byte) 7, publicKeyBytes, UUID.randomUUID());
+            logger.info("Request: " + request);
+            oos.writeObject(request);
+            oos.flush();
+
+            logger.info("Waiting for public key from server");
+            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
+            Wrapper response = (Wrapper) ois.readObject();
+
+            // Generate public key from received bytes
+            KeyFactory keyFactory = KeyFactory.getInstance("DH");
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(response.getMessage());
+            PublicKey receivedPublicKey = keyFactory.generatePublic(publicKeySpec);
+
+            // Perform the DH key agreement
+            KeyAgreement keyAgreement = KeyAgreement.getInstance("DH");
+            keyAgreement.init(keyPair.getPrivate());
+            keyAgreement.doPhase(receivedPublicKey, true);
+
+            // Generate the shared secret
+            byte[] sharedSecret = keyAgreement.generateSecret();
+
+            // Derive a symmetric key from the shared secret
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            byte[] derivedKey = messageDigest.digest(sharedSecret);
+            SecretKey secretKey = new SecretKeySpec(derivedKey, "AES");
+
+            return secretKey;
+
+        } catch (IOException e) {
+            logger.warning("Error performing DH key exchange: " + e.getMessage());
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            logger.warning("Error performing DH key exchange: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     private static byte[] serialize(Object object) throws IOException {
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-             ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
+                ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
             objectOutputStream.writeObject(object);
             objectOutputStream.flush();
             return byteArrayOutputStream.toByteArray();
@@ -518,7 +616,7 @@ public class CommandApp {
 
     private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-             ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
+                ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
             return objectInputStream.readObject();
         }
     }

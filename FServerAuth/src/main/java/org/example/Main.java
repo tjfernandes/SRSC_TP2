@@ -6,8 +6,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.MessageDigest;
+import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 import java.util.Properties;
 import java.util.UUID;
@@ -18,8 +24,10 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
+import javax.crypto.KeyAgreement;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -35,9 +43,8 @@ import org.example.utils.Wrapper;
 
 public class Main {
 
-    public static final String[] CONFPROTOCOLS = {"TLSv1.2"};
-    ;
-    public static final String[] CONFCIPHERSUITES = {"TLS_RSA_WITH_AES_256_CBC_SHA256"};
+    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
+    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
     public static final String KEYSTORE_PASSWORD = "authentication_password";
     public static final String KEYSTORE_PATH = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD = "authentication_truststore_password";
@@ -75,8 +82,7 @@ public class Main {
                             new Date(lr.getMillis()),
                             lr.getLevel().getLocalizedName(),
                             lr.getLoggerName(),
-                            lr.getMessage()
-                    );
+                            lr.getMessage());
                 }
             });
             logger.addHandler(handler);
@@ -85,13 +91,16 @@ public class Main {
         }
     }
 
+    private static SecretKey dhKey;
+
     public static void main(String[] args) {
         // Set the logger level
-        logger.setLevel(Level.SEVERE);
+        logger.setLevel(Level.INFO);
 
         Authentication authentication = new Authentication();
+        dhKey = null;
         // Register a user
-        //authentication.register("client", "12345");
+        // authentication.register("client", "12345");
 
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
@@ -111,14 +120,83 @@ public class Main {
 
     private static void handleRequest(SSLSocket requestSocket, Authentication authentication, Properties props) {
         try {
-
+            logger.severe("Handling request");
             // Create input and output streams for the socket
-            ObjectInputStream objectInputStream = new ObjectInputStream(requestSocket.getInputStream());
+            ObjectInputStream ois = new ObjectInputStream(requestSocket.getInputStream());
+
+            // Read the message from the client
+            Wrapper wrapper = (Wrapper) ois.readObject();
+            byte messageType = wrapper.getMessageType();
+
+            // Handle the message
+            switch (messageType) {
+                case 1:
+                    handleAuthentication(requestSocket, authentication, props, wrapper);
+                    break;
+                case 7:
+                    handleKeyExchange(requestSocket, authentication, props, wrapper);
+                    break;
+                default:
+                    break;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void handleKeyExchange(SSLSocket requestSocket, Authentication authentication, Properties props,
+            Wrapper wrapper) {
+        try {
+            logger.severe("Handling key exchange");
+            // Create input and output streams for the socket
+            ObjectOutputStream oos = new ObjectOutputStream(requestSocket.getOutputStream());
+
+            byte[] publicKeyBytes = wrapper.getMessage();
+
+            // Generate DH parameters
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
+            keyPairGenerator.initialize(2048); // Adjust the key size as needed
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+            // Generate public key and send it back to the sender
+            byte[] receiverPublicKeyBytes = keyPair.getPublic().getEncoded();
+            Wrapper response = new Wrapper((byte) 8, receiverPublicKeyBytes, wrapper.getMessageId());
+            oos.writeObject(response);
+            oos.flush();
+
+            // Generate public key from received bytes
+            KeyFactory keyFactory = KeyFactory.getInstance("DH");
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyBytes);
+            PublicKey receivedPublicKey = keyFactory.generatePublic(publicKeySpec);
+
+            // Perform the DH key agreement
+            KeyAgreement keyAgreement = KeyAgreement.getInstance("DH");
+            keyAgreement.init(keyPair.getPrivate());
+            keyAgreement.doPhase(receivedPublicKey, true);
+
+            // Generate the shared secret
+            byte[] sharedSecret = keyAgreement.generateSecret();
+
+            // Derive a symmetric key from the shared secret
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            byte[] derivedKey = messageDigest.digest(sharedSecret);
+            dhKey = new SecretKeySpec(derivedKey, "AES");
+            logger.info("DH key: " + dhKey);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void handleAuthentication(SSLSocket requestSocket, Authentication authentication, Properties props,
+            Wrapper wrapper) {
+        try {
+            logger.severe("Handling authentication");
+            // Create input and output streams for the socket
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(requestSocket.getOutputStream());
 
             // Read the message from the client
-            Wrapper wrapper = (Wrapper) objectInputStream.readObject();
-            RequestAuthenticationMessage requestAuthenticationMessage = (RequestAuthenticationMessage) deserialize(wrapper.getMessage());
+            RequestAuthenticationMessage requestAuthenticationMessage = (RequestAuthenticationMessage) deserialize(
+                    wrapper.getMessage());
             byte messageType = wrapper.getMessageType();
             UUID uuid = wrapper.getMessageId();
 
@@ -128,7 +206,9 @@ public class Main {
             SecretKey generatedkey = kg.generateKey();
 
             // Create a TGT
-            TicketGrantingTicket tgt = new TicketGrantingTicket(requestAuthenticationMessage.getClientId(), requestAuthenticationMessage.getClientAddress(), requestAuthenticationMessage.getServiceId(), generatedkey);
+            TicketGrantingTicket tgt = new TicketGrantingTicket(requestAuthenticationMessage.getClientId(),
+                    requestAuthenticationMessage.getClientAddress(), requestAuthenticationMessage.getServiceId(),
+                    generatedkey);
             byte[] tgtBytes = serialize(tgt);
 
             // Key to encrypt TGT
@@ -147,7 +227,8 @@ public class Main {
             // Encrypt TGT and send it to the client
             byte[] encryptedTGT = CryptoStuff.getInstance().encrypt(secretKeyTGT, tgtBytes);
             byte[] responseBytes = serialize(new ResponseAuthenticationMessage(generatedkey, encryptedTGT));
-            objectOutputStream.writeObject(new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid, OK));
+            objectOutputStream.writeObject(
+                    new Wrapper(messageType, CryptoStuff.getInstance().encrypt(secretKey, responseBytes), uuid, OK));
             objectOutputStream.flush();
 
         } catch (Exception e) {
@@ -155,20 +236,20 @@ public class Main {
         }
     }
 
-
     private static SSLServerSocket server() {
 
         try {
-            //KeyStore
+            // KeyStore
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
-            //TrustStore
+            // TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
             // SSLContext
@@ -189,7 +270,7 @@ public class Main {
 
     private static byte[] serialize(Object object) throws IOException {
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-             ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
+                ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
             objectOutputStream.writeObject(object);
             objectOutputStream.flush();
             return byteArrayOutputStream.toByteArray();
@@ -198,7 +279,7 @@ public class Main {
 
     private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-             ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
+                ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
             return objectInputStream.readObject();
         }
     }

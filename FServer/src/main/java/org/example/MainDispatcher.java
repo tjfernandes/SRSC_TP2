@@ -76,8 +76,7 @@ public class MainDispatcher {
                             new Date(lr.getMillis()),
                             lr.getLevel().getLocalizedName(),
                             lr.getLoggerName(),
-                            lr.getMessage()
-                    );
+                            lr.getMessage());
                 }
             });
             logger.addHandler(handler);
@@ -88,44 +87,43 @@ public class MainDispatcher {
 
     public static void main(String[] args) throws Exception {
         // Set the log level
-        logger.setLevel(Level.SEVERE);
+        logger.setLevel(Level.INFO);
 
-       // Create a new thread to the client
-       new Thread(() -> initTLSServerSocket()).start();
-       System.out.println("Server started on port " + MY_PORT);
+        // Create a new thread to the client
+        new Thread(() -> initTLSServerSocket()).start();
+        System.out.println("Server started on port " + MY_PORT);
     }
 
     private static void initTLSServerSocket() {
         try {
-            //Keystore
-            System.out.println("Loading keystore...");
+            // Keystore
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
             // TrustStore
-            System.out.println("Loading truststore...");
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
-    
+
             // SSLContext
-            System.out.println("Setting up SSL context...");
             SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(CONFPROTOCOLS);
             serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            logger.severe("Server started on port " + MY_PORT);
 
             while (true) {
                 SSLSocket socket = (SSLSocket) serverSocket.accept();
-                System.out.println("New connection accepted");
+                logger.severe("New connection accepted");
                 ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
                 Wrapper message = (Wrapper) objectInputStream.readObject();
-                System.out.println(message);
+                logger.info("Received request: " + message);
                 new Thread(() -> clientHandleRequest(message, socket)).start();
             }
 
@@ -142,13 +140,13 @@ public class MainDispatcher {
             SSLSocket socket = initTLSClientSocket(chooseModule(request));
 
             // Forward the request to the correct socket
-            System.out.println("Forwarding request to " + chooseModule(request));
+            logger.info("Forwarding request to " + chooseModule(request));
             ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
             objectOutputStream.writeObject(request);
             objectOutputStream.flush();
 
             // Get the response from the correct socket
-            System.out.println("Waiting for response from " + chooseModule(request));
+            logger.info("Waiting for response from " + chooseModule(request));
             ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
             Wrapper response = (Wrapper) objectInputStream.readObject();
 
@@ -164,7 +162,7 @@ public class MainDispatcher {
 
         // Choose the correct socket based on the message type
         return switch (type) {
-            case 1 -> ModuleName.AUTHENTICATION;
+            case 1, 7 -> ModuleName.AUTHENTICATION;
             case 3 -> ModuleName.ACCESS_CONTROL;
             case 6 -> ModuleName.STORAGE;
             default -> {
@@ -196,19 +194,20 @@ public class MainDispatcher {
         SSLSocket socket = null;
         try {
             String[] hostAndPort = getHostAndPort(module);
-    
-            //KeyStore
+
+            // KeyStore
             System.out.println("Loading keystore...");
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
-    
-            //TrustStore
+
+            // TrustStore
             System.out.println("Loading truststore...");
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
 
             // Set up the SSLContext
@@ -228,8 +227,9 @@ public class MainDispatcher {
             socket.startHandshake();
 
             return socket;
-    
-        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException | KeyManagementException | UnrecoverableKeyException e) {
+
+        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | CertificateException
+                | KeyManagementException | UnrecoverableKeyException e) {
             e.printStackTrace();
         }
         return null;
