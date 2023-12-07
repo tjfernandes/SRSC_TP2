@@ -50,7 +50,7 @@ public class StorageService {
     }
 
     // Custom logger to print the timestamp in milliseconds
-    private static final Logger logger = Logger.getLogger(StorageService.class.getName());
+    public static final Logger logger = Logger.getLogger(StorageService.class.getName());
     static {
         try {
             Logger rootLogger = Logger.getLogger("");
@@ -79,6 +79,7 @@ public class StorageService {
     }
 
     public static void main(String[] args) {
+
         // Set logger level
         logger.setLevel(Level.SEVERE);
 
@@ -106,6 +107,7 @@ public class StorageService {
                 e.printStackTrace();
             }
         }
+
     }
 
     // Process the command and returns the payload and the code

@@ -1,16 +1,23 @@
-FROM openjdk:17
+FROM maven:3.8.1-openjdk-17 as build
 
 WORKDIR /app
-COPY target/FServerStorage-1.jar app.jar
-COPY src/main/resources/keystore.jks keystore.jks
-COPY src/main/resources/truststore.jks truststore.jks
-COPY src/main/resources/dispatcher.cer dispatcher.cer
-COPY src/main/resources/storage.cer storage.cer
-COPY src/main/resources/filesystem-config.properties filesystem-config.properties
-COPY src/main/resources/dropbox-config.properties dropbox-config.properties
-COPY src/main/resources/crypto-config.properties crypto-config.properties
-COPY src/main/resources/ola.txt ola.txt
 
+COPY src src
+COPY pom.xml pom.xml
+RUN mvn package
+
+FROM openjdk:17
+
+COPY --from=build /app/target/FServerStorage-1-jar-with-dependencies.jar /app/app.jar
+COPY src/main/resources/keystore.jks /app/keystore.jks
+COPY src/main/resources/truststore.jks /app/truststore.jks
+COPY src/main/resources/dispatcher.cer /app/dispatcher.cer
+COPY src/main/resources/storage.cer /app/storage.cer
+COPY src/main/resources/filesystem-config.properties /app/filesystem-config.properties
+COPY src/main/resources/dropbox-config.properties /app/dropbox-config.properties
+COPY src/main/resources/crypto-config.properties /app/crypto-config.properties
+
+WORKDIR /app
 EXPOSE 8083
 
-CMD ["java", "-jar", "app.jar"]
+CMD ["java", "-jar", "app.jar", "org.example.StorageService"]
