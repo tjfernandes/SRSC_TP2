@@ -1,9 +1,0 @@
-org/example/Main.class
-org/example/utils/ResponseTGSMessage.class
-org/example/utils/Wrapper.class
-org/example/Crypto/CryptoException.class
-org/example/utils/RequestTGSMessage.class
-org/example/utils/Authenticator.class
-org/example/utils/ServiceGrantingTicket.class
-org/example/utils/TicketGrantingTicket.class
-org/example/Crypto/CryptoStuff.class
