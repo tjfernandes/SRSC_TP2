@@ -38,6 +38,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -97,7 +98,8 @@ public class CommandApp {
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InvalidKeyException, NoSuchAlgorithmException,
+            InvalidAlgorithmParameterException, InvalidKeySpecException {
         // Set the logger level
         logger.setLevel(Level.INFO);
 
@@ -183,16 +185,13 @@ public class CommandApp {
                     if (fullCommand.length != 3)
                         throw new InvalidCommandException("Command format should be: login username password");
                     try {
-                        mapUsers.get(username).setDhKey(performDHKeyExchange(initTLSSocket()));
-                    } catch (InvalidKeyException | NoSuchAlgorithmException | InvalidAlgorithmParameterException
-                            | InvalidKeySpecException ex) {
-                        logger.warning("Error performing DH key exchange: " + ex.getMessage());
-                        ex.printStackTrace();
-                    }
-                    try {
+                        TimeoutUtils.runWithTimeout(() -> {
+                            mapUsers.get(username).setDhKey(performDHKeyExchange(initTLSSocket()));
+                        }, 3000);
+
                         processLogin(initTLSSocket(), username, fullCommand[2]);
                         response = "User '" + username + "' authenticated with success!";
-                    } catch (UserNotFoundException | IncorrectPasswordException ex) {
+                    } catch (UserNotFoundException | IncorrectPasswordException | TimeoutException ex) {
                         response = ex.getMessage();
                     }
                 } else {
@@ -288,11 +287,17 @@ public class CommandApp {
     }
 
     private static void processLogin(SSLSocket socket, String clientId, String password)
-            throws UserNotFoundException, IncorrectPasswordException {
+            throws UserNotFoundException, IncorrectPasswordException, TimeoutException {
         // Handle auth
         logger.severe("Starting authentication");
-        sendAuthRequest(socket, clientId);
-        mapUsers.get(clientId).setTGT(processAuthResponse(socket, clientId, password));
+        TimeoutUtils.runWithTimeout(() -> {
+            try {
+                sendAuthRequest(socket, clientId);
+                mapUsers.get(clientId).setTGT(processAuthResponse(socket, clientId, password));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, 5000);
     }
 
     private static CommandReturn requestCommand(SSLSocket socket, String[] fullCommand, byte[] payload)
@@ -550,20 +555,18 @@ public class CommandApp {
         return responseServiceMessage;
     }
 
-    private static SecretKey performDHKeyExchange(SSLSocket socket)
-            throws NoSuchAlgorithmException,
-            InvalidAlgorithmParameterException, InvalidKeyException, InvalidKeySpecException {
+    private static SecretKey performDHKeyExchange(SSLSocket socket) {
 
         logger.severe("Performing DH key exchange");
         // Generate DH parameters
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
-        keyPairGenerator.initialize(2048); // Adjust the key size as needed
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
-
-        // Generate public key and send it to the other endpoint
-        byte[] publicKeyBytes = keyPair.getPublic().getEncoded();
-
         try {
+            logger.info("Generating DH parameters");
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH");
+            keyPairGenerator.initialize(2048); // Adjust the key size as needed
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+            // Generate public key and send it to the other endpoint
+            byte[] publicKeyBytes = keyPair.getPublic().getEncoded();
             logger.info("Trying to start outstream");
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
@@ -597,10 +600,7 @@ public class CommandApp {
 
             return secretKey;
 
-        } catch (IOException e) {
-            logger.warning("Error performing DH key exchange: " + e.getMessage());
-            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
+        } catch (Exception e) {
             logger.warning("Error performing DH key exchange: " + e.getMessage());
             e.printStackTrace();
         }
