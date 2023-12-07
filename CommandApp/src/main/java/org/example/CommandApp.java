@@ -6,6 +6,7 @@ import org.example.exceptions.ForbiddenException;
 import org.example.exceptions.IncorrectPasswordException;
 import org.example.exceptions.InternalServerErrorException;
 import org.example.exceptions.InvalidCommandException;
+import org.example.exceptions.NotFoundException;
 import org.example.exceptions.UserNotFoundException;
 import org.example.utils.*;
 
@@ -201,40 +202,41 @@ public class CommandApp {
                         try {
                             commandReturn = requestCommand(socket, fullCommand, payload[0]);
                         } catch (Exception ex) {
-                            logger.warning("Error requesting command: " + ex.getMessage());
                             response = ex.getMessage();
                         }
+                        if (commandReturn != null) {
+                            byte[] payloadReceived = commandReturn.getPayload();
+                            if (payloadReceived.length > 0) {
+                                String userHome = System.getProperty("user.home");
+                                String downloadsDir;
 
-                        byte[] payloadReceived = commandReturn.getPayload();
-                        if (payloadReceived.length > 0) {
-                            String userHome = System.getProperty("user.home");
-                            String downloadsDir;
+                                String fileName = UUID.randomUUID().toString();
 
-                            String fileName = UUID.randomUUID().toString();
+                                // Determine the default downloads directory based on the operating system
+                                String os = System.getProperty("os.name").toLowerCase();
+                                if (os.contains("win")) {
+                                    downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
+                                } else if (os.contains("mac")) {
+                                    downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
+                                } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+                                    downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
+                                } else {
+                                    downloadsDir = userHome + "/" + fileName; // For other systems
+                                }
 
-                            // Determine the default downloads directory based on the operating system
-                            String os = System.getProperty("os.name").toLowerCase();
-                            if (os.contains("win")) {
-                                downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
-                            } else if (os.contains("mac")) {
-                                downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
-                            } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-                                downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
-                            } else {
-                                downloadsDir = userHome + "/" + fileName; // For other systems
-                            }
-
-                            try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-                                fos.write(payloadReceived);
-                                response = "File downloaded successfully to: " + downloadsDir;
-                            } catch (Exception ex) {
-                                response = "File wasn't successfully downloaded in dir: " + downloadsDir;
+                                try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
+                                    fos.write(payloadReceived);
+                                    response = "File downloaded successfully to: " + downloadsDir;
+                                } catch (Exception ex) {
+                                    response = "File wasn't successfully downloaded in dir: " + downloadsDir;
+                                }
                             }
                         }
                     } else {
                         response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
                                 "Authenticate user with command: login username password";
                     }
+
                 }
             }
             outputText.setText(response + "\n");
@@ -385,7 +387,7 @@ public class CommandApp {
             case FORBIDDEN:
                 throw new ForbiddenException();
             case NOT_FOUND:
-                throw new FileNotFoundException();
+                throw new NotFoundException();
             case INTERNAL_SERVER_ERROR:
                 throw new InternalServerErrorException();
             case CONFLICT:
