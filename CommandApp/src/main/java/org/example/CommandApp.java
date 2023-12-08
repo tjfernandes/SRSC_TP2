@@ -59,7 +59,7 @@ public class CommandApp {
     public static final char[] TRUSTSTORE_PASSWORD = "client_truststore_password".toCharArray();
     public static final String TRUSTSTORE_PATH = "/truststore.jks";
     public static final String TLS_VERSION = "TLSv1.2";
-    public static final String DISPATCHER_HOST = "172.17.0.1";
+    public static final String DISPATCHER_HOST = "localhost";
     public static final int DISPATCHER_PORT = 8080;
 
     private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
@@ -169,7 +169,7 @@ public class CommandApp {
                                 BasicFileAttributes.class);
                         logger.info("File metadata: " + attrs);
                         metadata.set(serialize(new FileMetadata(attrs)));
-                        logger.info("File metadata serialized: " + metadata);
+                        logger.info("File metadata serialized: " + metadata.get());
                         payload.set(Files.readAllBytes(selectedFile.toPath()));
                     } catch (IOException ex) {
                         logger.warning("Error reading file: " + ex.getMessage());
@@ -218,7 +218,7 @@ public class CommandApp {
                             TimeoutUtils.runWithTimeout(() -> {
                                 try {
                                     commandReturn.set(requestCommand(socket, fullCommand,
-                                            serialize(new FilePayload(metadata.get(), payload.get()))));
+                                            new FilePayload(metadata.get(), payload.get())));
                                 } catch (Exception exc) {
                                     response.set(exc.getMessage());
                                 }
@@ -323,7 +323,7 @@ public class CommandApp {
         mapUsers.get(clientId).setTGT(processAuthResponse(socket, clientId, password));
     }
 
-    private static CommandReturn requestCommand(SSLSocket socket, String[] fullCommand, byte[] payload)
+    private static CommandReturn requestCommand(SSLSocket socket, String[] fullCommand, FilePayload filePayload)
             throws Exception {
         logger.severe("Requesting command: " + fullCommand[0]);
         Authenticator authenticator = null;
@@ -346,8 +346,8 @@ public class CommandApp {
                 if (fullCommand.length != 3)
                     throw new InvalidCommandException(
                             "Command format should be: " + clientId + "username path/file");
-
-                command = new Command(fullCommand[0], clientId, payload, fullCommand[2]);
+                logger.info("File payload: " + filePayload);
+                command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2]);
                 break;
             case "get, rm":
                 if (fullCommand.length != 2)
@@ -361,7 +361,7 @@ public class CommandApp {
                     throw new InvalidCommandException(
                             "Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
 
-                command = new Command(fullCommand[0], clientId, payload, fullCommand[2], fullCommand[3]);
+                command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2], fullCommand[3]);
                 break;
             case "file":
                 // TODO - construtores do CommandApp não consistentes com o enunciado? ou

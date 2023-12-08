@@ -272,7 +272,7 @@ public class StorageService {
         }
     }
 
-    public static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
+    private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
         try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
                 ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
             return objectInputStream.readObject();

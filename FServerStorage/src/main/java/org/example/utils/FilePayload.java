@@ -2,7 +2,8 @@ package org.example.utils;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.util.Arrays;
+
+import org.bouncycastle.util.encoders.Hex;
 
 public class FilePayload implements Serializable {
     @Serial
@@ -27,8 +28,8 @@ public class FilePayload implements Serializable {
     @Override
     public String toString() {
         return "FilePayload{" +
-                "metaData=" + metaData +
-                ", fileContent=" + Arrays.toString(fileContent) +
+                "metaData=" + Hex.toHexString(metaData) +
+                ", fileContent=" + Hex.toHexString(fileContent) +
                 '}';
     }
 }

@@ -2,7 +2,6 @@ package org.example.utils;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.util.Arrays;
 
 public class FilePayload implements Serializable {
     @Serial
@@ -28,7 +27,7 @@ public class FilePayload implements Serializable {
     public String toString() {
         return "FilePayload{" +
                 "metaData=" + metaData +
-                ", fileContent=" + Arrays.toString(fileContent) +
+                ", fileContent=" + fileContent +
                 '}';
     }
 }
