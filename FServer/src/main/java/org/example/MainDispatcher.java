@@ -2,6 +2,7 @@ package org.example;
 
 import javax.net.ssl.*;
 
+import org.example.utils.TimeoutUtils;
 import org.example.utils.Wrapper;
 
 import java.io.*;
@@ -39,6 +40,7 @@ public class MainDispatcher {
     public static final String TRUSTSTORE_PATH = "/app/truststore.jks";
     public static final String TLS_VERSION = "TLSv1.2";
     public static final int MY_PORT = 8080;
+    public static final long TIMEOUT = 10000;
 
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
@@ -124,7 +126,7 @@ public class MainDispatcher {
                 ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
                 Wrapper message = (Wrapper) objectInputStream.readObject();
                 logger.info("Received request: " + message);
-                new Thread(() -> clientHandleRequest(message, socket)).start();
+                TimeoutUtils.runWithTimeout(() -> clientHandleRequest(message, socket), TIMEOUT);
             }
 
         } catch (Exception e) {
@@ -162,7 +164,7 @@ public class MainDispatcher {
 
         // Choose the correct socket based on the message type
         return switch (type) {
-            case 1, 7 -> ModuleName.AUTHENTICATION;
+            case 0, 1 -> ModuleName.AUTHENTICATION;
             case 3 -> ModuleName.ACCESS_CONTROL;
             case 6 -> ModuleName.STORAGE;
             default -> {

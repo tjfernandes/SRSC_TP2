@@ -80,9 +80,6 @@ public class LocalFileSystemDriver {
             StorageService.logger.log(Level.INFO, "Folder listed in local filesystem: " + path);
             return new Pair<>(fileList,
                     fileList.size() > 0 ? MessageStatus.OK.getCode() : MessageStatus.OK_NO_CONTENT.getCode());
-        } catch (NoSuchFileException e) {
-            StorageService.logger.log(Level.INFO, "Folder not found in local filesystem: " + path);
-            return new Pair<>(null, MessageStatus.NOT_FOUND.getCode());
         } catch (IOException e) {
             StorageService.logger.log(Level.INFO, "Error while listing folder in local filesystem: " + path);
             return new Pair<>(null, MessageStatus.INTERNAL_SERVER_ERROR.getCode());

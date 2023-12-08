@@ -11,8 +11,8 @@ import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.Properties;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -37,9 +37,9 @@ import org.example.utils.RequestTGSMessage;
 import org.example.utils.ResponseTGSMessage;
 import org.example.utils.ServiceGrantingTicket;
 import org.example.utils.TicketGrantingTicket;
+import org.example.utils.TimeoutUtils;
 import org.example.utils.Wrapper;
 
-import java.security.cert.Certificate;
 import java.time.LocalDateTime;
 
 public class AccessControlService {
@@ -56,6 +56,8 @@ public class AccessControlService {
 
     private static final String ALGORITHM = "AES";
     private static final int KEYSIZE = 256;
+
+    private static final long TIMEOUT = 10000;
 
     private static SecretKey tgsKey;
     private static SecretKey storageKey;
@@ -115,10 +117,11 @@ public class AccessControlService {
             System.out.println("Server is listening on socket...");
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                Thread clientThread = new Thread(() -> handleRequest(clientSocket, serverSocket));
-                clientThread.start();
+                TimeoutUtils.runWithTimeout(() -> handleRequest(clientSocket, serverSocket), TIMEOUT);
             } catch (IOException e) {
                 e.printStackTrace();
+            } catch (TimeoutException e) {
+                logger.warning("Connection timed out.");
             }
         }
     }
@@ -136,15 +139,6 @@ public class AccessControlService {
             // TrustStore
             KeyStore trustStore = KeyStore.getInstance("JKS");
             trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-            Enumeration<String> aliases = trustStore.aliases();
-
-            // Print all certificates in truststore
-            while (aliases.hasMoreElements()) {
-                String alias = aliases.nextElement();
-                Certificate certificate = trustStore.getCertificate(alias);
-                System.out.println("Alias: " + alias);
-                System.out.println("Certificate: " + certificate.toString());
-            }
 
             TrustManagerFactory trustManagerFactory = TrustManagerFactory
                     .getInstance(TrustManagerFactory.getDefaultAlgorithm());

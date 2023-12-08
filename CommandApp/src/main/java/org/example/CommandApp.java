@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -68,6 +69,8 @@ public class CommandApp {
     private static final byte[] salt = { 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00, 0x0f, 0x0d, 0x0e, 0x0c, 0x07,
             0x06, 0x05, 0x04 };
     private static Map<String, UserInfo> mapUsers;
+
+    private static final long TIMEOUT = 10000;
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(CommandApp.class.getName());
@@ -177,22 +180,29 @@ public class CommandApp {
         requestButton.addActionListener(e -> {
             String command = commandTextField.getText();
             String[] fullCommand = command.split(" ");
-            String response = "";
+            final AtomicReference<String> response = new AtomicReference<>();
             if (fullCommand.length > 1) {
                 String username = fullCommand[1];
-                mapUsers.putIfAbsent(username, new UserInfo());
+
                 if (fullCommand[0].equals("login")) {
                     if (fullCommand.length != 3)
                         throw new InvalidCommandException("Command format should be: login username password");
                     try {
                         TimeoutUtils.runWithTimeout(() -> {
-                            mapUsers.get(username).setDhKey(performDHKeyExchange(initTLSSocket()));
-                        }, 3000);
-
-                        processLogin(initTLSSocket(), username, fullCommand[2]);
-                        response = "User '" + username + "' authenticated with success!";
-                    } catch (UserNotFoundException | IncorrectPasswordException | TimeoutException ex) {
-                        response = ex.getMessage();
+                            SecretKey key = performDHKeyExchange(initTLSSocket());
+                            mapUsers.putIfAbsent(username, new UserInfo());
+                            mapUsers.get(username).setDhKey(key);
+                        }, TIMEOUT);
+                        TimeoutUtils.runWithTimeout(() -> {
+                            try {
+                                processLogin(initTLSSocket(), username, fullCommand[2]);
+                            } catch (UserNotFoundException | IncorrectPasswordException ex) {
+                                response.set(ex.getMessage());
+                            }
+                        }, TIMEOUT);
+                        response.set("User '" + username + "' authenticated with success!");
+                    } catch (TimeoutException ex) {
+                        response.set(ex.getMessage());
                     }
                 } else {
                     if (mapUsers.get(username).getTGT() != null) {
@@ -201,7 +211,7 @@ public class CommandApp {
                         try {
                             commandReturn = requestCommand(socket, fullCommand, payload[0]);
                         } catch (Exception ex) {
-                            response = ex.getMessage();
+                            response.set(ex.getMessage());
                         }
                         if (commandReturn != null) {
                             byte[] payloadReceived = commandReturn.getPayload();
@@ -225,15 +235,19 @@ public class CommandApp {
 
                                 try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
                                     fos.write(payloadReceived);
-                                    response = "File downloaded successfully to: " + downloadsDir;
+                                    response.set("File downloaded successfully to: " + downloadsDir);
                                 } catch (Exception ex) {
-                                    response = "File wasn't successfully downloaded in dir: " + downloadsDir;
+                                    response.set("File wasn't successfully downloaded in dir: " + downloadsDir);
                                 }
+                            } else {
+                                response.set("There is no content to be displayed.");
                             }
+                        } else {
+                            response.set("");
                         }
                     } else {
-                        response = "User '" + fullCommand[1] + "' is not authenticated.\n" +
-                                "Authenticate user with command: login username password";
+                        response.set("User '" + fullCommand[1] + "' is not authenticated.\n" +
+                                "Authenticate user with command: login username password");
                     }
 
                 }
@@ -287,17 +301,11 @@ public class CommandApp {
     }
 
     private static void processLogin(SSLSocket socket, String clientId, String password)
-            throws UserNotFoundException, IncorrectPasswordException, TimeoutException {
+            throws UserNotFoundException, IncorrectPasswordException {
         // Handle auth
         logger.severe("Starting authentication");
-        TimeoutUtils.runWithTimeout(() -> {
-            try {
-                sendAuthRequest(socket, clientId);
-                mapUsers.get(clientId).setTGT(processAuthResponse(socket, clientId, password));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }, 5000);
+        sendAuthRequest(socket, clientId);
+        mapUsers.get(clientId).setTGT(processAuthResponse(socket, clientId, password));
     }
 
     private static CommandReturn requestCommand(SSLSocket socket, String[] fullCommand, byte[] payload)
@@ -484,9 +492,9 @@ public class CommandApp {
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
 
             Wrapper wrapper = (Wrapper) ois.readObject();
-            int responseStatus = wrapper.getStatus();
+            MessageStatus responseStatus = MessageStatus.fromCode(wrapper.getStatus());
             switch (responseStatus) {
-                case 200:
+                case OK:
                     byte[] encryptedResponse = wrapper.getMessage();
                     try {
                         SecretKey clientKey = CryptoStuff.getInstance()
@@ -497,7 +505,7 @@ public class CommandApp {
                         throw new IncorrectPasswordException("This password is incorrect.");
                     }
                     break;
-                case 401:
+                case UNAUTHORIZED:
                     throw new UserNotFoundException(clientId);
                 default:
                     break;
@@ -571,7 +579,7 @@ public class CommandApp {
             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
             logger.info("Sending public key to server");
-            Wrapper request = new Wrapper((byte) 7, publicKeyBytes, UUID.randomUUID());
+            Wrapper request = new Wrapper((byte) 0, publicKeyBytes, UUID.randomUUID());
             logger.info("Request: " + request);
             oos.writeObject(request);
             oos.flush();

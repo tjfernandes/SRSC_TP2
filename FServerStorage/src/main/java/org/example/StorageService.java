@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -26,6 +27,7 @@ import org.example.utils.CommandReturn;
 import org.example.utils.RequestServiceMessage;
 import org.example.utils.ResponseServiceMessage;
 import org.example.utils.ServiceGrantingTicket;
+import org.example.utils.TimeoutUtils;
 import org.example.utils.Wrapper;
 import org.example.utils.Pair;
 
@@ -44,6 +46,8 @@ public class StorageService {
 
     public static final String ALGORITHM = "AES";
     public static final int KEYSIZE = 256;
+
+    private static final long TIMEOUT = 10000;
 
     enum CommandEnum {
         GET, PUT, RM, LS, MKDIR, CP, FILE
@@ -100,11 +104,12 @@ public class StorageService {
         while (true) {
             try {
                 SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                Thread clientThread = new Thread(
-                        () -> handleRequest(clientSocket, serverSocket, fsManager, crypto, key));
-                clientThread.start();
+                TimeoutUtils.runWithTimeout(() -> handleRequest(clientSocket, serverSocket, fsManager, crypto, key),
+                        TIMEOUT);
             } catch (IOException e) {
                 e.printStackTrace();
+            } catch (TimeoutException e) {
+                logger.warning("Connection timed out.");
             }
         }
 
@@ -134,6 +139,7 @@ public class StorageService {
                 pair = fsManager.lsCommand(clientId, command.getPath());
                 code = pair.second;
                 payload = pair.first;
+                logger.severe("Status: " + code);
                 break;
             case MKDIR:
                 code = fsManager.mkdirCommand(clientId, command.getPath());
@@ -147,7 +153,8 @@ public class StorageService {
                 code = pair.second;
                 break;
         }
-
+        if (payload == null)
+            return new Pair<>(new CommandReturn(command), code);
         return new Pair<>(new CommandReturn(command, payload), code);
 
     }

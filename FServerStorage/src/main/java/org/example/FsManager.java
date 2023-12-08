@@ -29,7 +29,7 @@ public class FsManager {
     private DropboxDriver dbx;
 
     private static final String DROPBOXCONFIG_PATH = "/app/dropbox-config.properties";
-    private static final String FILESYSTEM_PATH = "/filesystem";
+    private static final String FILESYSTEM_PATH = "/app/filesystem";
     private static final String FULL_PATH_FORMAT_STRING = "%s/%s/%s";
     private static final int BLOCK_SIZE_IN_BYTES = 4 * 1024;
 
@@ -38,10 +38,10 @@ public class FsManager {
         dbx = new DropboxDriver(DROPBOXCONFIG_PATH);
 
         try {
-            Files.createDirectories(Paths.get("FILESYSTEM_PATH"));
+            Files.createDirectories(Paths.get("filesystem"));
 
             // Dummy client folders on the local file system and on Dropbox
-            Files.createDirectories(Paths.get("FILESYSTEM_PATH" + "/client"));
+            Files.createDirectories(Paths.get("filesystem" + "/client"));
             dbx.deleteDirectory("client");
             dbx.createFolder("client");
 
@@ -64,13 +64,13 @@ public class FsManager {
     public Pair<byte[], Integer> lsCommand(String clientId, String path) {
         Pair<List<String>, Integer> result = fs.listFolder(createFullPath(clientId, path));
         List<String> list = result.first;
-        Integer errorCode = result.second;
+        Integer status = result.second;
 
         if (list != null) {
             byte[] fileArray = String.join("\n", list).getBytes(StandardCharsets.UTF_8);
-            return new Pair<>(fileArray, errorCode);
+            return new Pair<>(fileArray, status);
         } else {
-            return new Pair<>(new byte[0], errorCode);
+            return new Pair<>(new byte[0], status);
         }
     }
 

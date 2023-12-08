@@ -17,6 +17,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -39,6 +40,7 @@ import org.example.crypto.CryptoStuff;
 import org.example.utils.RequestAuthenticationMessage;
 import org.example.utils.ResponseAuthenticationMessage;
 import org.example.utils.TicketGrantingTicket;
+import org.example.utils.TimeoutUtils;
 import org.example.utils.Wrapper;
 
 public class AuthenticationService {
@@ -62,6 +64,8 @@ public class AuthenticationService {
     public static final int OK = 200;
     public static final int UNAUTHORIZED = 401;
     private static SecretKey keyTGT = null;
+
+    private static final long TIMEOUT = 10000;
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(AuthenticationService.class.getName());
@@ -113,10 +117,12 @@ public class AuthenticationService {
             keyTGT = CryptoStuff.getInstance().convertStringToSecretKey(props.getProperty(TGS_KEY));
             while (true) {
                 SSLSocket socket = (SSLSocket) serverSocket.accept();
-                new Thread(() -> handleRequest(socket, authentication, props)).start();
+                TimeoutUtils.runWithTimeout(() -> handleRequest(socket, authentication, props), TIMEOUT);
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (TimeoutException e) {
+            logger.warning("Connection timed out");
         }
     }
 
@@ -132,11 +138,11 @@ public class AuthenticationService {
 
             // Handle the message
             switch (messageType) {
+                case 0:
+                    handleKeyExchange(requestSocket, authentication, props, wrapper);
+                    break;
                 case 1:
                     handleAuthentication(requestSocket, authentication, props, wrapper);
-                    break;
-                case 7:
-                    handleKeyExchange(requestSocket, authentication, props, wrapper);
                     break;
                 default:
                     break;
@@ -162,7 +168,7 @@ public class AuthenticationService {
 
             // Generate public key and send it back to the sender
             byte[] receiverPublicKeyBytes = keyPair.getPublic().getEncoded();
-            Wrapper response = new Wrapper((byte) 8, receiverPublicKeyBytes, wrapper.getMessageId());
+            Wrapper response = new Wrapper(wrapper.getMessageType(), receiverPublicKeyBytes, wrapper.getMessageId());
             oos.writeObject(response);
             oos.flush();
 
