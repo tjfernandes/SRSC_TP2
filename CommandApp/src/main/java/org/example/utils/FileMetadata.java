@@ -5,25 +5,25 @@ import java.io.Serializable;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 
-public class FileMetaData implements Serializable {
+public class FileMetadata implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
     private final long size;
-    private final FileTime creationTime;
-    private final FileTime lastAccessTime;
-    private final FileTime lastModifiedTime;
+    private final SerializableFileTime creationTime;
+    private final SerializableFileTime lastAccessTime;
+    private final SerializableFileTime lastModifiedTime;
     private final boolean isDirectory;
     private final boolean isRegularFile;
     private final boolean isSymbolicLink;
     private final boolean isOther;
 
-    public FileMetaData(BasicFileAttributes attrs) {
+    public FileMetadata(BasicFileAttributes attrs) {
         this.size = attrs.size();
-        this.creationTime = attrs.creationTime();
-        this.lastAccessTime = attrs.lastAccessTime();
-        this.lastModifiedTime = attrs.lastModifiedTime();
+        this.creationTime = new SerializableFileTime(attrs.creationTime());
+        this.lastAccessTime = new SerializableFileTime(attrs.lastAccessTime());
+        this.lastModifiedTime = new SerializableFileTime(attrs.lastModifiedTime());
         this.isDirectory = attrs.isDirectory();
         this.isRegularFile = attrs.isRegularFile();
         this.isSymbolicLink = attrs.isSymbolicLink();
@@ -35,15 +35,15 @@ public class FileMetaData implements Serializable {
     }
 
     public FileTime getCreationTime() {
-        return creationTime;
+        return creationTime.toFileTime();
     }
 
     public FileTime getLastAccessTime() {
-        return lastAccessTime;
+        return lastAccessTime.toFileTime();
     }
 
     public FileTime getLastModifiedTime() {
-        return lastModifiedTime;
+        return lastModifiedTime.toFileTime();
     }
 
     public boolean isDirectory() {

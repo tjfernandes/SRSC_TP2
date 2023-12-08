@@ -22,6 +22,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -148,7 +149,8 @@ public class CommandApp {
         panel.add(fileNameLabel, gbc);
 
         JButton submitFileButton = new JButton("Submit File");
-        final byte[][] payload = new byte[1][1];
+        final AtomicReference<byte[]> payload = new AtomicReference<>();
+        final AtomicReference<byte[]> metadata = new AtomicReference<>();
         submitFileButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -162,11 +164,15 @@ public class CommandApp {
                 if (result == JFileChooser.APPROVE_OPTION) {
                     // Get the selected file
                     File selectedFile = fileChooser.getSelectedFile();
-
                     try {
-                        payload[0] = Files.readAllBytes(selectedFile.toPath());
+                        BasicFileAttributes attrs = Files.readAttributes(selectedFile.toPath(),
+                                BasicFileAttributes.class);
+                        logger.info("File metadata: " + attrs);
+                        metadata.set(serialize(new FileMetadata(attrs)));
+                        logger.info("File metadata serialized: " + metadata);
+                        payload.set(Files.readAllBytes(selectedFile.toPath()));
                     } catch (IOException ex) {
-                        throw new RuntimeException(ex);
+                        logger.warning("Error reading file: " + ex.getMessage());
                     }
 
                     // Process the selected file (you can define your logic here)
@@ -207,43 +213,52 @@ public class CommandApp {
                 } else {
                     if (mapUsers.get(username).getTGT() != null) {
                         SSLSocket socket = initTLSSocket();
-                        CommandReturn commandReturn = null;
+                        AtomicReference<CommandReturn> commandReturn = new AtomicReference<>();
                         try {
-                            commandReturn = requestCommand(socket, fullCommand, payload[0]);
-                        } catch (Exception ex) {
-                            response.set(ex.getMessage());
-                        }
-                        if (commandReturn != null) {
-                            byte[] payloadReceived = commandReturn.getPayload();
-                            if (payloadReceived.length > 0) {
-                                String userHome = System.getProperty("user.home");
-                                String downloadsDir;
-
-                                String fileName = UUID.randomUUID().toString();
-
-                                // Determine the default downloads directory based on the operating system
-                                String os = System.getProperty("os.name").toLowerCase();
-                                if (os.contains("win")) {
-                                    downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
-                                } else if (os.contains("mac")) {
-                                    downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
-                                } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-                                    downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
-                                } else {
-                                    downloadsDir = userHome + "/" + fileName; // For other systems
+                            TimeoutUtils.runWithTimeout(() -> {
+                                try {
+                                    commandReturn.set(requestCommand(socket, fullCommand,
+                                            serialize(new FilePayload(metadata.get(), payload.get()))));
+                                } catch (Exception exc) {
+                                    response.set(exc.getMessage());
                                 }
+                            }, TIMEOUT);
 
-                                try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-                                    fos.write(payloadReceived);
-                                    response.set("File downloaded successfully to: " + downloadsDir);
-                                } catch (Exception ex) {
-                                    response.set("File wasn't successfully downloaded in dir: " + downloadsDir);
+                            if (commandReturn.get() != null) {
+                                byte[] payloadReceived = commandReturn.get().getPayload();
+                                if (payloadReceived.length > 0) {
+                                    switch (fullCommand[0]) {
+                                        case "ls":
+                                            response.set(new String(payloadReceived));
+                                            break;
+                                        case "mkdir":
+                                            response.set("Folder created successfully.");
+                                            break;
+                                        case "put":
+                                            response.set("File uploaded successfully.");
+                                            break;
+                                        case "get":
+                                            response.set(getProcess(payloadReceived));
+                                            break;
+                                        case "rm":
+                                            response.set("File removed successfully.");
+                                            break;
+                                        case "cp":
+                                            response.set("File copied successfully.");
+                                            break;
+                                        default:
+                                            response.set("Command not recognized.");
+                                            break;
+                                    }
+
+                                } else {
+                                    response.set("There is no content to be displayed.");
                                 }
                             } else {
-                                response.set("There is no content to be displayed.");
+                                response.set("");
                             }
-                        } else {
-                            response.set("");
+                        } catch (TimeoutException ex) {
+                            response.set(ex.getMessage());
                         }
                     } else {
                         response.set("User '" + fullCommand[1] + "' is not authenticated.\n" +
@@ -561,6 +576,32 @@ public class CommandApp {
             e.printStackTrace();
         }
         return responseServiceMessage;
+    }
+
+    private static String getProcess(byte[] payloadReceived) {
+        String userHome = System.getProperty("user.home");
+        String downloadsDir;
+
+        String fileName = UUID.randomUUID().toString();
+
+        // Determine the default downloads directory based on the operating system
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
+        } else if (os.contains("mac")) {
+            downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
+        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
+        } else {
+            downloadsDir = userHome + "/" + fileName; // For other systems
+        }
+
+        try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
+            fos.write(payloadReceived);
+            return "File downloaded successfully to: " + downloadsDir;
+        } catch (Exception ex) {
+            return "File wasn't successfully downloaded in dir: " + downloadsDir;
+        }
     }
 
     private static SecretKey performDHKeyExchange(SSLSocket socket) {
