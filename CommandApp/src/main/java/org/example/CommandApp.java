@@ -14,8 +14,6 @@ import java.awt.event.*;
 
 import javax.crypto.KeyAgreement;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
 import javax.swing.*;
@@ -33,7 +31,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.KeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 import java.util.HashMap;
@@ -62,13 +59,10 @@ public class CommandApp {
     public static final String DISPATCHER_HOST = "localhost";
     public static final int DISPATCHER_PORT = 8080;
 
-    private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
-
     private static final String TGS_ID = "access_control";
     private static final String CLIENT_ADDR = "127.0.0.1";
     private static final String SERVICE_ID = "storage";
-    private static final byte[] salt = { 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00, 0x0f, 0x0d, 0x0e, 0x0c, 0x07,
-            0x06, 0x05, 0x04 };
+
     private static Map<String, UserInfo> mapUsers;
 
     private static final long TIMEOUT = 10000;
@@ -198,6 +192,7 @@ public class CommandApp {
                             SecretKey key = performDHKeyExchange(initTLSSocket());
                             mapUsers.putIfAbsent(username, new UserInfo());
                             mapUsers.get(username).setDhKey(key);
+                            mapUsers.get(username).setKeyPassword(fullCommand[2]);
                         }, TIMEOUT);
                         TimeoutUtils.runWithTimeout(() -> {
                             try {
@@ -211,59 +206,74 @@ public class CommandApp {
                         response.set(ex.getMessage());
                     }
                 } else {
-                    if (mapUsers.get(username).getTGT() != null) {
-                        SSLSocket socket = initTLSSocket();
-                        AtomicReference<CommandReturn> commandReturn = new AtomicReference<>();
-                        try {
-                            TimeoutUtils.runWithTimeout(() -> {
-                                try {
-                                    commandReturn.set(requestCommand(socket, fullCommand,
-                                            new FilePayload(metadata.get(), payload.get())));
-                                } catch (Exception exc) {
-                                    response.set(exc.getMessage());
-                                }
-                            }, TIMEOUT);
-
-                            if (commandReturn.get() != null) {
-                                byte[] payloadReceived = commandReturn.get().getPayload();
-                                if (payloadReceived.length > 0) {
-                                    switch (fullCommand[0]) {
-                                        case "ls":
-                                            response.set(new String(payloadReceived));
-                                            break;
-                                        case "mkdir":
-                                            response.set("Folder created successfully.");
-                                            break;
-                                        case "put":
-                                            response.set("File uploaded successfully.");
-                                            break;
-                                        case "get":
-                                            response.set(getProcess(payloadReceived));
-                                            break;
-                                        case "rm":
-                                            response.set("File removed successfully.");
-                                            break;
-                                        case "cp":
-                                            response.set("File copied successfully.");
-                                            break;
-                                        default:
-                                            response.set("Command not recognized.");
-                                            break;
+                    UserInfo userInfo = mapUsers.get(username);
+                    if (userInfo != null) {
+                        if (userInfo.getTGT() != null) {
+                            SSLSocket socket = initTLSSocket();
+                            AtomicReference<CommandReturn> commandReturn = new AtomicReference<>();
+                            try {
+                                TimeoutUtils.runWithTimeout(() -> {
+                                    if (payload.get() == null)
+                                        try {
+                                            commandReturn.set(requestCommand(socket, fullCommand, null));
+                                        } catch (Exception e1) {
+                                            response.set(e1.getMessage());
+                                        }
+                                    else {
+                                        byte[] encryptedPayload;
+                                        try {
+                                            encryptedPayload = CryptoStuff.getInstance()
+                                                    .encrypt(userInfo.getKeyPassword(), payload.get());
+                                            commandReturn.set(requestCommand(socket, fullCommand,
+                                                    new FilePayload(metadata.get(), encryptedPayload)));
+                                        } catch (Exception e1) {
+                                            response.set(e1.getMessage());
+                                        }
                                     }
+                                }, TIMEOUT);
 
+                                if (commandReturn.get() != null) {
+                                    byte[] payloadReceived = commandReturn.get().getPayload();
+                                    if (payloadReceived.length > 0) {
+                                        switch (fullCommand[0]) {
+                                            case "ls":
+                                                response.set(new String(payloadReceived));
+                                                break;
+                                            case "mkdir":
+                                                response.set("Folder created successfully.");
+                                                break;
+                                            case "put":
+                                                response.set("File uploaded successfully.");
+                                                break;
+                                            case "get":
+                                                response.set(getProcess(payloadReceived, userInfo.getKeyPassword()));
+                                                break;
+                                            case "rm":
+                                                response.set("File removed successfully.");
+                                                break;
+                                            case "cp":
+                                                response.set("File copied successfully.");
+                                                break;
+                                            default:
+                                                response.set("Command not recognized.");
+                                                break;
+                                        }
+
+                                    } else {
+                                        response.set("There is no content to be displayed.");
+                                    }
                                 } else {
-                                    response.set("There is no content to be displayed.");
+                                    response.set("");
                                 }
-                            } else {
-                                response.set("");
+                            } catch (TimeoutException ex) {
+                                response.set(ex.getMessage());
                             }
-                        } catch (TimeoutException ex) {
-                            response.set(ex.getMessage());
-                        }
-                    } else {
+                        } else
+                            response.set("User '" + fullCommand[1] + "' is not authenticated.\n" +
+                                    "Authenticate user with command: login username password");
+                    } else
                         response.set("User '" + fullCommand[1] + "' is not authenticated.\n" +
                                 "Authenticate user with command: login username password");
-                    }
 
                 }
             }
@@ -333,7 +343,7 @@ public class CommandApp {
         String clientId = fullCommand[1];
         switch (fullCommand[0]) {
             case "ls", "mkdir":
-                if (fullCommand.length < 2 || fullCommand.length > 3)
+                if (fullCommand.length < 2 || fullCommand.length > 4)
                     throw new InvalidCommandException(
                             "Command format should be: " + fullCommand[0] + " username path");
                 if (fullCommand.length == 2) {
@@ -349,12 +359,11 @@ public class CommandApp {
                 logger.info("File payload: " + filePayload);
                 command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2]);
                 break;
-            case "get, rm":
-                if (fullCommand.length != 2)
+            case "get", "rm":
+                if (fullCommand.length != 3)
                     throw new InvalidCommandException(
                             "Command format should be: " + fullCommand[0] + "username path/file");
-
-                command = new Command(fullCommand[0], clientId, clientId);
+                command = new Command(fullCommand[0], clientId, fullCommand[2]);
                 break;
             case "cp":
                 if (fullCommand.length != 4)
@@ -373,28 +382,35 @@ public class CommandApp {
         // Request SGT from TGS
         authenticator = new Authenticator(clientId, CLIENT_ADDR, command);
 
-        authenticatorSerialized = serialize(authenticator);
-        ResponseAuthenticationMessage tgt = mapUsers.get(clientId).getTGT();
-        sendTGSRequest(socket, tgt.getEncryptedTGT(),
-                CryptoStuff.getInstance()
-                        .encrypt(tgt.getGeneratedKey(),
-                                authenticatorSerialized),
-                command);
+        try {
+            authenticatorSerialized = serialize(authenticator);
 
-        mapUsers.get(clientId).addSGT(commandString,
-                processTGSResponse(socket, tgt.getGeneratedKey()));
+            ResponseAuthenticationMessage tgt = mapUsers.get(clientId).getTGT();
+            sendTGSRequest(socket, tgt.getEncryptedTGT(),
+                    CryptoStuff.getInstance()
+                            .encrypt(tgt.getGeneratedKey(),
+                                    authenticatorSerialized),
+                    command);
 
-        SSLSocket serviceSocket = initTLSSocket();
-        ResponseTGSMessage sgt = mapUsers.get(clientId).getSGT(commandString);
-        logger.info("Sending service request");
-        sendServiceRequest(serviceSocket, command, sgt);
+            mapUsers.get(clientId).addSGT(commandString,
+                    processTGSResponse(socket, tgt.getGeneratedKey()));
 
-        // Communication logic with the server
-        logger.info("Waiting for service response");
-        ObjectInputStream ois = new ObjectInputStream(serviceSocket.getInputStream());
-        Wrapper wrapper = (Wrapper) ois.readObject();
+            SSLSocket serviceSocket = initTLSSocket();
+            ResponseTGSMessage sgt = mapUsers.get(clientId).getSGT(commandString);
+            logger.info("Sending service request");
+            sendServiceRequest(serviceSocket, command, sgt);
 
-        return processResponse(wrapper, sgt.getSessionKey(), clientId, commandString);
+            // Communication logic with the server
+            logger.info("Waiting for service response");
+            ObjectInputStream ois = new ObjectInputStream(serviceSocket.getInputStream());
+            Wrapper wrapper = (Wrapper) ois.readObject();
+
+            return processResponse(wrapper, sgt.getSessionKey(), clientId, commandString);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return null;
     }
 
     private static CommandReturn processResponse(Wrapper wrapper, SecretKey sessionKey, String clientId, String command)
@@ -512,8 +528,7 @@ public class CommandApp {
                 case OK:
                     byte[] encryptedResponse = wrapper.getMessage();
                     try {
-                        SecretKey clientKey = CryptoStuff.getInstance()
-                                .convertByteArrayToSecretKey(hashPassword(password));
+                        SecretKey clientKey = mapUsers.get(clientId).getKeyPassword();
                         byte[] descryptedResponse = CryptoStuff.getInstance().decrypt(clientKey, encryptedResponse);
                         responseAuthenticationMessage = (ResponseAuthenticationMessage) deserialize(descryptedResponse);
                     } catch (CryptoException e) {
@@ -525,8 +540,7 @@ public class CommandApp {
                 default:
                     break;
             }
-        } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException | NoSuchAlgorithmException
-                | InvalidKeySpecException e) {
+        } catch (IOException | ClassNotFoundException | InvalidAlgorithmParameterException e) {
             e.printStackTrace();
         }
         return responseAuthenticationMessage;
@@ -578,7 +592,7 @@ public class CommandApp {
         return responseServiceMessage;
     }
 
-    private static String getProcess(byte[] payloadReceived) {
+    private static String getProcess(byte[] payloadReceived, SecretKey key) {
         String userHome = System.getProperty("user.home");
         String downloadsDir;
 
@@ -597,7 +611,7 @@ public class CommandApp {
         }
 
         try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-            fos.write(payloadReceived);
+            fos.write(CryptoStuff.getInstance().decrypt(key, payloadReceived));
             return "File downloaded successfully to: " + downloadsDir;
         } catch (Exception ex) {
             return "File wasn't successfully downloaded in dir: " + downloadsDir;
@@ -670,15 +684,5 @@ public class CommandApp {
                 ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
             return objectInputStream.readObject();
         }
-    }
-
-    private static byte[] hashPassword(String password) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        int iterations = 10000;
-        int keyLength = 256;
-
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, keyLength);
-        SecretKeyFactory factory = SecretKeyFactory.getInstance(HASHING_ALGORITHMS);
-        byte[] hash = factory.generateSecret(spec).getEncoded();
-        return hash;
     }
 }
