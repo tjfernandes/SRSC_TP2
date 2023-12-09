@@ -139,7 +139,6 @@ public class StorageService {
                 pair = fsManager.lsCommand(clientId, command.getPath());
                 code = pair.second;
                 payload = pair.first;
-                logger.severe("Status: " + code);
                 break;
             case MKDIR:
                 code = fsManager.mkdirCommand(clientId, command.getPath());
