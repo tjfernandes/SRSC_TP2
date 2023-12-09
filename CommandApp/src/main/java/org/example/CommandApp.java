@@ -343,7 +343,7 @@ public class CommandApp {
         String clientId = fullCommand[1];
         switch (fullCommand[0]) {
             case "ls", "mkdir":
-                if (fullCommand.length < 2 || fullCommand.length > 3)
+                if (fullCommand.length < 2 || fullCommand.length > 4)
                     throw new InvalidCommandException(
                             "Command format should be: " + fullCommand[0] + " username path");
                 if (fullCommand.length == 2) {
@@ -360,7 +360,7 @@ public class CommandApp {
                 command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2]);
                 break;
             case "get", "rm":
-                if (fullCommand.length != 2)
+                if (fullCommand.length != 3)
                     throw new InvalidCommandException(
                             "Command format should be: " + fullCommand[0] + "username path/file");
                 command = new Command(fullCommand[0], clientId, fullCommand[2]);
