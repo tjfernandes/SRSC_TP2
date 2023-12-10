@@ -38,14 +38,14 @@ public class MainDispatcher {
     public static final String TRUSTSTORE_PASSWORD = "dispatcher_truststore_password";
     public static final String TRUSTSTORE_PATH = "/app/truststore.jks";
     public static final String TLS_VERSION = "TLSv1.2";
+    public static final String TLS_CONFIG = "/app/tls-config.properties";
     public static final int MY_PORT = 8080;
     public static final long TIMEOUT = 10000;
 
     private static final Properties properties = new Properties();
 
     static {
-        try (InputStream input = MainDispatcher.class.getClassLoader()
-                .getResourceAsStream("/app/tls-config.properties")) {
+        try (FileInputStream input = new FileInputStream(TLS_CONFIG)) {
             properties.load(input);
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -133,8 +133,8 @@ public class MainDispatcher {
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
             serverSocket.setEnabledProtocols(TLS_PROT_ENF);
             serverSocket.setEnabledCipherSuites(CIPHERSUITES);
-            boolean needAuth = TLS_AUTH_CLI.equals("MUTUAL");
-            serverSocket.setNeedClientAuth(needAuth);
+            // boolean needAuth = TLS_AUTH_CLI.equals("MUTUAL");
+            // serverSocket.setNeedClientAuth(needAuth);
 
             logger.severe("Server started on port " + MY_PORT);
 

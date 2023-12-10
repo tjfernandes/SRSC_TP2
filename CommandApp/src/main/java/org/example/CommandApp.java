@@ -175,9 +175,7 @@ public class CommandApp {
                     try {
                         BasicFileAttributes attrs = Files.readAttributes(selectedFile.toPath(),
                                 BasicFileAttributes.class);
-                        logger.info("File metadata: " + attrs);
                         metadata.set(serialize(new FileMetadata(attrs)));
-                        logger.info("File metadata serialized: " + metadata.get());
                         payload.set(Files.readAllBytes(selectedFile.toPath()));
                     } catch (IOException ex) {
                         logger.warning("Error reading file: " + ex.getMessage());
@@ -329,7 +327,7 @@ public class CommandApp {
             socket.setEnabledProtocols(TLS_PROT_ENF);
             socket.setEnabledCipherSuites(CIPHERSUITES);
             boolean needAuth = TLS_AUTH.equals("MUTUAL");
-            socket.setNeedClientAuth(needAuth);
+            // socket.setNeedClientAuth(needAuth);
             socket.setUseClientMode(!needAuth);
 
             socket.startHandshake();

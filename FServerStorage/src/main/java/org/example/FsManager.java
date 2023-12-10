@@ -124,11 +124,11 @@ public class FsManager {
                     ObjectInputStream ois = new ObjectInputStream(bis)) {
                 fileInfo = (FileInfo) ois.readObject();
             } catch (ClassNotFoundException e) {
-                e.printStackTrace();
+                System.out.println(e.getMessage());
                 return new Pair<>(new byte[0], MessageStatus.INTERNAL_SERVER_ERROR.getCode());
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println(e.getMessage());
             return new Pair<>(new byte[0], MessageStatus.INTERNAL_SERVER_ERROR.getCode());
         }
 
@@ -137,8 +137,8 @@ public class FsManager {
         byte[] fileContent = new byte[blockOrder.size() * BLOCK_SIZE_IN_BYTES];
         for (int i = 0; i < blockOrder.size(); i++) {
             UUID uuid = blockOrder.get(i);
-            String blockPath = createPath(clientId, uuid.toString());
-            Pair<byte[], Integer> blockPair = dbx.downloadFile(blockPath);
+            String blockPath = createPath(clientId, path);
+            Pair<byte[], Integer> blockPair = fs.downloadFile(blockPath);
             if (blockPair.second != MessageStatus.OK.getCode()) {
                 return new Pair<>(new byte[0], blockPair.second);
             }

@@ -2,7 +2,6 @@ package org.example;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
@@ -67,8 +66,7 @@ public class AccessControlService {
     private static final Properties properties = new Properties();
 
     static {
-        try (InputStream input = AccessControl.class.getClassLoader()
-                .getResourceAsStream("/app/tls-config.properties")) {
+        try (FileInputStream input = new FileInputStream("/app/tls-config.properties")) {
             properties.load(input);
         } catch (IOException ex) {
             ex.printStackTrace();

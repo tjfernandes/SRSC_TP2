@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.security.KeyFactory;
@@ -68,8 +67,7 @@ public class AuthenticationService {
     private static final Properties properties = new Properties();
 
     static {
-        try (InputStream input = AuthenticationService.class.getClassLoader()
-                .getResourceAsStream("/app/tls-config.properties")) {
+        try (FileInputStream input = new FileInputStream("/app/tls-config.properties")) {
             properties.load(input);
         } catch (IOException ex) {
             ex.printStackTrace();

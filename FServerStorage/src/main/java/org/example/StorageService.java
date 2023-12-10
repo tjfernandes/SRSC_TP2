@@ -54,8 +54,7 @@ public class StorageService {
     private static final Properties properties = new Properties();
 
     static {
-        try (InputStream input = StorageService.class.getClassLoader()
-                .getResourceAsStream("/app/tls-config.properties")) {
+        try (FileInputStream input = new FileInputStream("/app/tls-config.properties")) {
             properties.load(input);
         } catch (IOException ex) {
             ex.printStackTrace();
