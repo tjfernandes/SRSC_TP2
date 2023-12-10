@@ -40,7 +40,7 @@ public class MainDispatcher {
     public static final String TLS_VERSION = "TLSv1.2";
     public static final String TLS_CONFIG = "/app/tls-config.properties";
     public static final int MY_PORT = 8080;
-    public static final long TIMEOUT = 10000;
+    public static final long TIMEOUT = 20000;
 
     private static final Properties properties = new Properties();
 
@@ -112,43 +112,45 @@ public class MainDispatcher {
     }
 
     private static void initTLSServerSocket() {
-        try {
-            // Keystore
-            KeyStore ks = KeyStore.getInstance("JKS");
-            ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
+        while (true) {
+            try {
+                // Keystore
+                KeyStore ks = KeyStore.getInstance("JKS");
+                ks.load(new FileInputStream(KEYSTORE_PATH), KEYSTORE_PASSWORD.toCharArray());
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+                kmf.init(ks, KEYSTORE_PASSWORD.toCharArray());
 
-            // TrustStore
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
-            TrustManagerFactory trustManagerFactory = TrustManagerFactory
-                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustManagerFactory.init(trustStore);
+                // TrustStore
+                KeyStore trustStore = KeyStore.getInstance("JKS");
+                trustStore.load(new FileInputStream(TRUSTSTORE_PATH), TRUSTSTORE_PASSWORD.toCharArray());
+                TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                        .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                trustManagerFactory.init(trustStore);
 
-            // SSLContext
-            SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
-            sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
-            SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
-            SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-            serverSocket.setEnabledProtocols(TLS_PROT_ENF);
-            serverSocket.setEnabledCipherSuites(CIPHERSUITES);
-            // boolean needAuth = TLS_AUTH_CLI.equals("MUTUAL");
-            // serverSocket.setNeedClientAuth(needAuth);
+                // SSLContext
+                SSLContext sslContext = SSLContext.getInstance(TLS_VERSION);
+                sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
+                SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
+                SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
+                serverSocket.setEnabledProtocols(TLS_PROT_ENF);
+                serverSocket.setEnabledCipherSuites(CIPHERSUITES);
+                // boolean needAuth = TLS_AUTH_CLI.equals("MUTUAL");
+                // serverSocket.setNeedClientAuth(needAuth);
 
-            logger.severe("Server started on port " + MY_PORT);
+                logger.severe("Server started on port " + MY_PORT);
 
-            while (true) {
-                SSLSocket socket = (SSLSocket) serverSocket.accept();
-                logger.severe("New connection accepted");
-                ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
-                Wrapper message = (Wrapper) objectInputStream.readObject();
-                logger.info("Received request: " + message);
-                TimeoutUtils.runWithTimeout(() -> clientHandleRequest(message, socket), TIMEOUT);
+                while (true) {
+                    SSLSocket socket = (SSLSocket) serverSocket.accept();
+                    logger.severe("New connection accepted");
+                    ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
+                    Wrapper message = (Wrapper) objectInputStream.readObject();
+                    logger.info("Received request: " + message);
+                    TimeoutUtils.runWithTimeout(() -> clientHandleRequest(message, socket), TIMEOUT);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 

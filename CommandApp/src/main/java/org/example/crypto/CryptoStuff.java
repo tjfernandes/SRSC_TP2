@@ -18,10 +18,8 @@ public class CryptoStuff {
             0x0f, 0x0d, 0x0e, 0x0c
     };
 
-    private GCMParameterSpec gcmParameterSpec;
-
     private CryptoStuff() {
-        gcmParameterSpec = new GCMParameterSpec(128, ivBytes);
+
     }
 
     public static CryptoStuff getInstance() {
@@ -42,6 +40,7 @@ public class CryptoStuff {
     private byte[] doCrypto(int cipherMode, Key key, byte[] inputBytes)
             throws CryptoException, InvalidAlgorithmParameterException {
         try {
+            GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(128, ivBytes);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
 
             cipher.init(cipherMode, key, gcmParameterSpec);

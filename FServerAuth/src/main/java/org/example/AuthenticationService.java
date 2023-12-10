@@ -115,8 +115,6 @@ public class AuthenticationService {
 
         Authentication authentication = new Authentication();
         dhKey = null;
-        // Register a user
-        // authentication.register("client", "12345");
 
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);

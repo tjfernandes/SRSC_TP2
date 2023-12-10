@@ -58,7 +58,7 @@ public class CommandApp {
 
     private static Map<String, UserInfo> mapUsers;
 
-    private static final long TIMEOUT = 10000;
+    private static final long TIMEOUT = 60000;
 
     private static final Properties properties = new Properties();
 
@@ -229,8 +229,14 @@ public class CommandApp {
                                         } else {
                                             byte[] encryptedPayload = CryptoStuff.getInstance()
                                                     .encrypt(userInfo.getKeyPassword(), payload.get());
+                                            byte[] encryptedMetadata = CryptoStuff.getInstance()
+                                                    .encrypt(userInfo.getKeyPassword(), metadata.get());
+
+                                            FilePayload filePayload = new FilePayload(encryptedMetadata,
+                                                    encryptedPayload);
                                             commandReturn.set(requestCommand(socket, fullCommand,
-                                                    new FilePayload(metadata.get(), encryptedPayload)));
+                                                    filePayload));
+
                                             processResponse(fullCommand[0], response, userInfo, commandReturn);
                                         }
                                     } catch (Exception e1) {
@@ -334,7 +340,7 @@ public class CommandApp {
                 logger.info("File payload: " + filePayload);
                 command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2]);
                 break;
-            case "get", "rm":
+            case "get", "rm", "file":
                 if (fullCommand.length != 3)
                     throw new Exception(
                             "Command format should be: " + fullCommand[0] + "username path/file");
@@ -346,8 +352,6 @@ public class CommandApp {
                             "Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
 
                 command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2], fullCommand[3]);
-                break;
-            case "file":
                 break;
             default:
                 throw new Exception("Command '" + fullCommand[0] + "' is invalid");
@@ -515,28 +519,55 @@ public class CommandApp {
         return responseAuthenticationMessage;
     }
 
-    public static ResponseTGSMessage processTGSResponse(SSLSocket socket, SecretKey key) {
+    public static ResponseTGSMessage processTGSResponse(SSLSocket socket, SecretKey key) throws Exception {
         logger.severe("Processing TGS response");
         ResponseTGSMessage responseTGSMessage = null;
+
+        // Communication logic with the server
+        ObjectInputStream ois = null;
         try {
-            // Communication logic with the server
-            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-
-            logger.info("Waiting for TGS response");
-            Wrapper wrapper = (Wrapper) ois.readObject();
-
-            logger.info("Attempting to decrypt TGS response");
-            // int responseStatus = wrapper.getStatus();
-            byte[] encryptedResponse = wrapper.getMessage();
-            byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
-
-            logger.info("Attempting to deserialize TGS response");
-            responseTGSMessage = (ResponseTGSMessage) deserialize(decryptedResponse);
-
-            logger.info("Finished processing TGS response");
-        } catch (Exception e) {
+            ois = new ObjectInputStream(socket.getInputStream());
+        } catch (IOException e) {
             e.printStackTrace();
         }
+
+        logger.info("Waiting for TGS response");
+        Wrapper wrapper = null;
+        try {
+            wrapper = (Wrapper) ois.readObject();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (wrapper.getStatus() == MessageStatus.FORBIDDEN.getCode()) {
+            throw new Exception("User is trying to use ../ on a absolute path");
+        } else if (wrapper.getStatus() == MessageStatus.UNAUTHORIZED.getCode()) {
+            throw new Exception("User does not have permission to do that operation");
+        }
+        logger.info("Attempting to decrypt TGS response");
+        // int responseStatus = wrapper.getStatus();
+        byte[] encryptedResponse = wrapper.getMessage();
+        byte[] decryptedResponse = null;
+        try {
+            decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
+        } catch (InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+        } catch (CryptoException e) {
+            e.printStackTrace();
+        }
+
+        logger.info("Attempting to deserialize TGS response");
+        try {
+            responseTGSMessage = (ResponseTGSMessage) deserialize(decryptedResponse);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        logger.info("Finished processing TGS response");
+
         return responseTGSMessage;
     }
 
@@ -586,6 +617,26 @@ public class CommandApp {
                     case "cp":
                         response.set("File copied successfully.");
                         break;
+                    case "file":
+                        try {
+                            byte[] decryptedPayload = CryptoStuff.getInstance().decrypt(userInfo.getKeyPassword(),
+                                    payloadReceived);
+
+                            ByteArrayInputStream bis = new ByteArrayInputStream(decryptedPayload);
+                            ObjectInput in = new ObjectInputStream(bis);
+                            FileMetadata fileMetadata = (FileMetadata) in.readObject();
+                            response.set(fileMetadata.toString());
+
+                        } catch (InvalidAlgorithmParameterException e) {
+                            e.printStackTrace();
+                        } catch (CryptoException e) {
+                            e.printStackTrace();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
+                        }
+                        break;
                     default:
                         response.set("Command not recognized.");
                         break;
@@ -601,26 +652,35 @@ public class CommandApp {
     private static String getProcess(byte[] payloadReceived, SecretKey key) {
         String userHome = System.getProperty("user.home");
         String downloadsDir;
-
         String fileName = UUID.randomUUID().toString();
 
         // Determine the default downloads directory based on the operating system
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
-            downloadsDir = userHome + "\\Downloads\\" + fileName; // For Windows
+            downloadsDir = userHome + "\\Downloads\\"; // For Windows
         } else if (os.contains("mac")) {
-            downloadsDir = userHome + "/Downloads/" + fileName; // For Mac
-        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            downloadsDir = userHome + "/Downloads/" + fileName; // For Linux/Unix
+            downloadsDir = userHome + "/Downloads/"; // For Mac
+        } else if (os.contains("nux") || os.contains("nix")) {
+            downloadsDir = userHome + "/Downloads/"; // For Linux/Unix
         } else {
-            downloadsDir = userHome + "/" + fileName; // For other systems
+            downloadsDir = userHome + "/"; // For other systems
         }
 
-        try (FileOutputStream fos = new FileOutputStream(downloadsDir)) {
-            fos.write(CryptoStuff.getInstance().decrypt(key, payloadReceived));
-            return "File downloaded successfully to: " + downloadsDir;
+        // Create the directory if it doesn't exist
+        File directory = new File(downloadsDir);
+        if (!directory.exists()) {
+            directory.mkdir();
+        }
+
+        // Append the filename to the directory
+        String filePath = downloadsDir + fileName;
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            byte[] decryptedData = CryptoStuff.getInstance().decrypt(key, payloadReceived);
+            fos.write(decryptedData);
+            return "File downloaded successfully to: " + filePath;
         } catch (Exception ex) {
-            return "File wasn't successfully downloaded in dir: " + downloadsDir;
+            ex.printStackTrace();
+            return "File wasn't successfully downloaded in dir: " + filePath;
         }
     }
 

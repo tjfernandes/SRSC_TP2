@@ -24,6 +24,7 @@ import org.example.crypto.CryptoStuff;
 import org.example.utils.Authenticator;
 import org.example.utils.Command;
 import org.example.utils.CommandReturn;
+import org.example.utils.MessageStatus;
 import org.example.utils.RequestServiceMessage;
 import org.example.utils.ResponseServiceMessage;
 import org.example.utils.ServiceGrantingTicket;
@@ -97,7 +98,7 @@ public class StorageService {
     public static void main(String[] args) {
 
         // Set logger level
-        logger.setLevel(Level.SEVERE);
+        logger.setLevel(Level.INFO);
 
         final SSLServerSocket serverSocket = server();
         FsManager fsManager = new FsManager();
@@ -124,7 +125,6 @@ public class StorageService {
                 logger.warning("Connection timed out.");
             }
         }
-
     }
 
     // Process the command and returns the payload and the code
@@ -159,7 +159,7 @@ public class StorageService {
                 code = fsManager.cpCommand(clientId, command.getPath(), command.getCpToPath());
                 break;
             case FILE:
-                pair = fsManager.getCommand(clientId, command.getPath());
+                pair = fsManager.fileCommand(clientId, command.getPath());
                 payload = pair.first;
                 code = pair.second;
                 break;
@@ -218,16 +218,11 @@ public class StorageService {
 
         LocalDateTime returnTime = authenticator.getTimestamp().plusNanos(1);
         Command command = sgt.getCommand();
+
         // Checking if the Authenticator is valid
         if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
             return new Pair<>(crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(
-                    new CommandReturn(command), returnTime))), 400);
-        }
-
-        // Checking if the command is valid
-        if (!command.isValid()) {
-            return new Pair<>(crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(
-                    new CommandReturn(command), returnTime))), 400);
+                    new CommandReturn(command), returnTime))), MessageStatus.UNAUTHORIZED.getCode());
         }
 
         String userId = sgt.getClientId();

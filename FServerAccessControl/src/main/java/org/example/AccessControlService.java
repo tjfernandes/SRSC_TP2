@@ -33,6 +33,7 @@ import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.utils.Authenticator;
 import org.example.utils.Command;
+import org.example.utils.MessageStatus;
 import org.example.utils.RequestTGSMessage;
 import org.example.utils.ResponseTGSMessage;
 import org.example.utils.ServiceGrantingTicket;
@@ -199,7 +200,8 @@ public class AccessControlService {
 
             // check if authenticator is valid
             if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
-                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(), 401);
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(),
+                        MessageStatus.UNAUTHORIZED.getCode());
                 objectOutputStream.writeObject(errorWrapper);
                 objectOutputStream.flush();
                 objectOutputStream.close();
@@ -211,7 +213,20 @@ public class AccessControlService {
 
             // check if the user has permissions for this command
             if (!accessControl.hasPermission(authenticator.getClientId(), command.getCommand())) {
-                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(), 401);
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(),
+                        MessageStatus.UNAUTHORIZED.getCode());
+                objectOutputStream.writeObject(errorWrapper);
+                objectOutputStream.flush();
+                objectOutputStream.close();
+                objectInputStream.close();
+                requestSocket.close();
+                return;
+            }
+
+            // Checking if the command is valid
+            if (!command.isValid()) {
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(),
+                        MessageStatus.FORBIDDEN.getCode());
                 objectOutputStream.writeObject(errorWrapper);
                 objectOutputStream.flush();
                 objectOutputStream.close();
@@ -240,7 +255,8 @@ public class AccessControlService {
             msgSerialized = CryptoStuff.getInstance().encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message
-            Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, wrapper.getMessageId(), 204);
+            Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, wrapper.getMessageId(),
+                    MessageStatus.OK_NO_CONTENT.getCode());
 
             // send wrapper message
             objectOutputStream.writeObject(wrapperMessage);
