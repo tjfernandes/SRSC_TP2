@@ -33,8 +33,6 @@ import org.example.utils.Pair;
 
 public class StorageService {
 
-    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
-    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
     public static final String KEYSTORE_PASSWORD = "storage_password";
     public static final String KEYSTORE_PATH = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD = "storage_truststore_password";
@@ -52,6 +50,21 @@ public class StorageService {
     enum CommandEnum {
         GET, PUT, RM, LS, MKDIR, CP, FILE
     }
+
+    private static final Properties properties = new Properties();
+
+    static {
+        try (InputStream input = StorageService.class.getClassLoader()
+                .getResourceAsStream("/app/tls-config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static final String[] TLS_PROT_ENF = properties.getProperty("TLS-PROT-ENF").split(",");
+    public static final String[] CIPHERSUITES = properties.getProperty("CIPHERSUITES").split(",");
+    public static final String TLS_AUTH = properties.getProperty("TLS-AUTH");
 
     // Custom logger to print the timestamp in milliseconds
     public static final Logger logger = Logger.getLogger(StorageService.class.getName());
@@ -249,8 +262,10 @@ public class StorageService {
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-            serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            serverSocket.setEnabledProtocols(TLS_PROT_ENF);
+            serverSocket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH.equals("MUTUAL");
+            serverSocket.setNeedClientAuth(needAuth);
 
             return serverSocket;
 

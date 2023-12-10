@@ -35,6 +35,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -47,8 +48,6 @@ import java.util.logging.SimpleFormatter;
 
 public class CommandApp {
 
-    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };
-    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
     public static final String KEYSTORE_TYPE = "JKS";
     public static final String KEYSTORE_PASSWORD = "client_password";
     public static final String KEYSTORE_PATH = "/keystore.jks";
@@ -66,6 +65,21 @@ public class CommandApp {
     private static Map<String, UserInfo> mapUsers;
 
     private static final long TIMEOUT = 10000;
+
+    private static final Properties properties = new Properties();
+
+    static {
+        try (InputStream input = CommandApp.class.getClassLoader()
+                .getResourceAsStream("/app/tls-config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static final String[] TLS_PROT_ENF = properties.getProperty("TLS-PROT-ENF").split(",");
+    public static final String[] CIPHERSUITES = properties.getProperty("CIPHERSUITES").split(",");
+    public static final String TLS_AUTH = properties.getProperty("TLS-AUTH");
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(CommandApp.class.getName());
@@ -312,9 +326,11 @@ public class CommandApp {
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
             socket = (SSLSocket) sslSocketFactory.createSocket(DISPATCHER_HOST, DISPATCHER_PORT);
-            socket.setUseClientMode(true);
-            socket.setEnabledProtocols(CONFPROTOCOLS);
-            socket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            socket.setEnabledProtocols(TLS_PROT_ENF);
+            socket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH.equals("MUTUAL");
+            socket.setNeedClientAuth(needAuth);
+            socket.setUseClientMode(!needAuth);
 
             socket.startHandshake();
 

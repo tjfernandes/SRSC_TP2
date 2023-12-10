@@ -2,6 +2,7 @@ package org.example;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
@@ -44,8 +45,6 @@ import java.time.LocalDateTime;
 
 public class AccessControlService {
 
-    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
-    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
     public static final String KEYSTORE_PASSWORD = "access_control_password";
     public static final String KEYSTORE_PATH = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD = "access_control_truststore_password";
@@ -64,6 +63,21 @@ public class AccessControlService {
 
     private static SSLServerSocket serverSocket;
     private static AccessControl accessControl;
+
+    private static final Properties properties = new Properties();
+
+    static {
+        try (InputStream input = AccessControl.class.getClassLoader()
+                .getResourceAsStream("/app/tls-config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static final String[] TLS_PROT_ENF = properties.getProperty("TLS-PROT-ENF").split(",");
+    public static final String[] CIPHERSUITES = properties.getProperty("CIPHERSUITES").split(",");
+    public static final String TLS_AUTH = properties.getProperty("TLS-AUTH");
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(AccessControlService.class.getName());
@@ -151,8 +165,10 @@ public class AccessControlService {
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             serverSocket = (SSLServerSocket) sslServerSocketFactory
                     .createServerSocket(PORT_2_DISPATCHER);
-            serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            serverSocket.setEnabledProtocols(TLS_PROT_ENF);
+            serverSocket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH.equals("MUTUAL");
+            serverSocket.setNeedClientAuth(needAuth);
 
         } catch (Exception e) {
             e.printStackTrace();

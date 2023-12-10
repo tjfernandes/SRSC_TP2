@@ -16,6 +16,7 @@ import java.security.cert.CertificateException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -32,8 +33,6 @@ public class MainDispatcher {
         ACCESS_CONTROL
     }
 
-    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
-    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
     public static final String KEYSTORE_PASSWORD = "dispatcher_password";
     public static final String KEYSTORE_PATH = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD = "dispatcher_truststore_password";
@@ -41,6 +40,22 @@ public class MainDispatcher {
     public static final String TLS_VERSION = "TLSv1.2";
     public static final int MY_PORT = 8080;
     public static final long TIMEOUT = 10000;
+
+    private static final Properties properties = new Properties();
+
+    static {
+        try (InputStream input = MainDispatcher.class.getClassLoader()
+                .getResourceAsStream("/app/tls-config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static final String[] TLS_PROT_ENF = properties.getProperty("TLS-PROT-ENF").split(",");
+    public static final String[] CIPHERSUITES = properties.getProperty("CIPHERSUITES").split(",");
+    public static final String TLS_AUTH_SRV = properties.getProperty("TLS-AUTH-SRV");
+    public static final String TLS_AUTH_CLI = properties.getProperty("TLS-AUTH-CLI");
 
     private static String[] getHostAndPort(ModuleName moduleName) {
         switch (moduleName) {
@@ -116,8 +131,11 @@ public class MainDispatcher {
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-            serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            serverSocket.setEnabledProtocols(TLS_PROT_ENF);
+            serverSocket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH_CLI.equals("MUTUAL");
+            serverSocket.setNeedClientAuth(needAuth);
+
             logger.severe("Server started on port " + MY_PORT);
 
             while (true) {
@@ -221,8 +239,10 @@ public class MainDispatcher {
             // Set up the socket to use TLSv1.2
             System.out.println("Setting up socket...");
             socket = (SSLSocket) sslSocketFactory.createSocket(hostAndPort[0], Integer.parseInt(hostAndPort[1]));
-            socket.setEnabledProtocols(CONFPROTOCOLS);
-            socket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            socket.setEnabledProtocols(TLS_PROT_ENF);
+            socket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH_SRV.equals("MUTUAL");
+            socket.setNeedClientAuth(needAuth);
 
             // Start the handshake
             System.out.println("Starting handshake...");

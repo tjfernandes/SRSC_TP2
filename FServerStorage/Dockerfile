@@ -16,6 +16,7 @@ COPY src/main/resources/storage.cer /app/storage.cer
 COPY src/main/resources/filesystem-config.properties /app/filesystem-config.properties
 COPY src/main/resources/dropbox-config.properties /app/dropbox-config.properties
 COPY src/main/resources/crypto-config.properties /app/crypto-config.properties
+COPY src/main/resources/tls-config.properties tls-config.properties
 
 WORKDIR /app
 EXPOSE 8083

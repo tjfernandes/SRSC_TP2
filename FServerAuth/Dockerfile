@@ -8,6 +8,7 @@ COPY src/main/resources/dispatcher.cer dispatcher.cer
 COPY src/main/resources/authentication.cer authentication.cer
 COPY src/main/resources/crypto-config.properties crypto-config.properties
 COPY src/main/resources/users.txt users.txt
+COPY src/main/resources/tls-config.properties tls-config.properties
 
 EXPOSE 8081
 
