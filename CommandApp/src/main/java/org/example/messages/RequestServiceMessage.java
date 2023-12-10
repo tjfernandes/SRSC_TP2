@@ -1,6 +1,8 @@
-package org.example.utils;
+package org.example.messages;
 
 import java.io.Serializable;
+
+import org.example.utils.Command;
 
 public class RequestServiceMessage implements Serializable {
     private static final long serialVersionUID = 1L;

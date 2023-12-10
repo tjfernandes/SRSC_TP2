@@ -1,4 +1,4 @@
-package org.example.utils;
+package org.example.messages;
 
 import javax.crypto.SecretKey;
 import java.io.Serializable;

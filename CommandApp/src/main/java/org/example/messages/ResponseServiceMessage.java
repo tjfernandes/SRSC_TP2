@@ -1,6 +1,8 @@
-package org.example.utils;
+package org.example.messages;
 
 import java.time.LocalDateTime;
+
+import org.example.utils.CommandReturn;
 
 public class ResponseServiceMessage implements java.io.Serializable {
     private final LocalDateTime issueTimeReturn;
@@ -10,7 +12,7 @@ public class ResponseServiceMessage implements java.io.Serializable {
         this.issueTimeReturn = LocalDateTime.now();
         this.commandReturn = commandReturn;
     }
-    
+
     public CommandReturn getcommandReturn() {
         return commandReturn;
     }

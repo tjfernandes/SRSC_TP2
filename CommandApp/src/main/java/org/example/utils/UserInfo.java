@@ -11,6 +11,8 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
 import org.example.crypto.CryptoStuff;
+import org.example.messages.ResponseAuthenticationMessage;
+import org.example.messages.ResponseTGSMessage;
 
 public class UserInfo {
 
@@ -24,6 +26,7 @@ public class UserInfo {
             0x02, 0x01, 0x00, 0x0f, 0x0d,
             0x0e, 0x0c, 0x07, 0x06, 0x05, 0x04
     };
+
     private static final String HASHING_ALGORITHMS = "PBKDF2WithHmacSHA256";
 
     public UserInfo() {

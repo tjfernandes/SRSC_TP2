@@ -1,4 +1,4 @@
-package org.example.utils;
+package org.example.messages;
 
 import java.io.Serial;
 import java.io.Serializable;

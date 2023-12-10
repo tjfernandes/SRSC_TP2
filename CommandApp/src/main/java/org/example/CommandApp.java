@@ -2,25 +2,22 @@ package org.example;
 
 import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;
-import org.example.exceptions.ForbiddenException;
 import org.example.exceptions.IncorrectPasswordException;
-import org.example.exceptions.InternalServerErrorException;
 import org.example.exceptions.InvalidCommandException;
-import org.example.exceptions.NotFoundException;
 import org.example.exceptions.UserNotFoundException;
+import org.example.messages.RequestAuthenticationMessage;
+import org.example.messages.RequestServiceMessage;
+import org.example.messages.RequestTGSMessage;
+import org.example.messages.ResponseAuthenticationMessage;
+import org.example.messages.ResponseServiceMessage;
+import org.example.messages.ResponseTGSMessage;
 import org.example.utils.*;
-
-import java.awt.event.*;
 
 import javax.crypto.KeyAgreement;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
-import javax.swing.*;
-import java.awt.*;
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -103,82 +100,11 @@ public class CommandApp {
 
         mapUsers = new HashMap<>();
 
-        JFrame frame = new JFrame("Remote FS");
-        frame.setSize(800, 400);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // Create the GUI
+        GUI gui = new GUI();
 
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-
-        JLabel inputInstruction = new JLabel("Enter your command");
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.anchor = GridBagConstraints.WEST;
-        panel.add(inputInstruction, gbc);
-
-        JTextField commandTextField = new JTextField(50);
-        gbc.gridy = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(commandTextField, gbc);
-
-        JTextArea outputText = new JTextArea();
-        outputText.setLineWrap(true);
-        outputText.setWrapStyleWord(true);
-        outputText.setEditable(false);
-        JScrollPane scrollPane = new JScrollPane(outputText);
-        scrollPane.setPreferredSize(new Dimension(750, 200));
-
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        gbc.gridwidth = 2;
-        gbc.fill = GridBagConstraints.BOTH;
-        panel.add(scrollPane, gbc);
-
-        JLabel fileNameLabel = new JLabel();
-        gbc.gridx = 0;
-        gbc.gridy = 3;
-        gbc.anchor = GridBagConstraints.WEST;
-        panel.add(fileNameLabel, gbc);
-
-        JButton submitFileButton = new JButton("Submit File");
-        final AtomicReference<byte[]> payload = new AtomicReference<>();
-        final AtomicReference<byte[]> metadata = new AtomicReference<>();
-        submitFileButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                // Implement file submission logic here
-                // This could involve opening a file chooser dialog and processing the selected
-                // file
-                // For example:
-                JFileChooser fileChooser = new JFileChooser();
-                int result = fileChooser.showOpenDialog(null);
-
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    // Get the selected file
-                    File selectedFile = fileChooser.getSelectedFile();
-                    try {
-                        BasicFileAttributes attrs = Files.readAttributes(selectedFile.toPath(),
-                                BasicFileAttributes.class);
-                        logger.info("File metadata: " + attrs);
-                        metadata.set(serialize(new FileMetadata(attrs)));
-                        logger.info("File metadata serialized: " + metadata.get());
-                        payload.set(Files.readAllBytes(selectedFile.toPath()));
-                    } catch (IOException ex) {
-                        logger.warning("Error reading file: " + ex.getMessage());
-                    }
-
-                    // Process the selected file (you can define your logic here)
-                    // For now, let's print the file name
-                    fileNameLabel.setText("Selected file: " + selectedFile.getName());
-                }
-            }
-        });
-
-        JButton requestButton = new JButton("Request");
-        requestButton.addActionListener(e -> {
-            String command = commandTextField.getText();
+        gui.setRequestButtonListener(e -> {
+            String command = gui.getCommand();
             String[] fullCommand = command.split(" ");
             final AtomicReference<String> response = new AtomicReference<>();
             if (fullCommand.length > 1) {
@@ -191,6 +117,7 @@ public class CommandApp {
                         TimeoutUtils.runWithTimeout(() -> {
                             SecretKey key = performDHKeyExchange(initTLSSocket());
                             mapUsers.putIfAbsent(username, new UserInfo());
+                            logger.info("Setting key: " + key);
                             mapUsers.get(username).setDhKey(key);
                             mapUsers.get(username).setKeyPassword(fullCommand[2]);
                         }, TIMEOUT);
@@ -213,20 +140,26 @@ public class CommandApp {
                             AtomicReference<CommandReturn> commandReturn = new AtomicReference<>();
                             try {
                                 TimeoutUtils.runWithTimeout(() -> {
-                                    if (payload.get() == null)
+                                    if (gui.getPayload().get() == null)
                                         try {
                                             commandReturn.set(requestCommand(socket, fullCommand, null));
-                                        } catch (Exception e1) {
+                                        } catch (InvalidKeyException | ClassNotFoundException
+                                                | InvalidAlgorithmParameterException | CryptoException e1) {
+                                            logger.warning(e1.getMessage());
+                                        } catch (RuntimeException e1) {
                                             response.set(e1.getMessage());
                                         }
                                     else {
                                         byte[] encryptedPayload;
                                         try {
                                             encryptedPayload = CryptoStuff.getInstance()
-                                                    .encrypt(userInfo.getKeyPassword(), payload.get());
+                                                    .encrypt(userInfo.getKeyPassword(), gui.getPayload().get());
                                             commandReturn.set(requestCommand(socket, fullCommand,
-                                                    new FilePayload(metadata.get(), encryptedPayload)));
-                                        } catch (Exception e1) {
+                                                    new FilePayload(gui.getMetadata().get(), encryptedPayload)));
+                                        } catch (InvalidKeyException | ClassNotFoundException
+                                                | InvalidAlgorithmParameterException | CryptoException e1) {
+                                            logger.warning(e1.getMessage());
+                                        } catch (RuntimeException e1) {
                                             response.set(e1.getMessage());
                                         }
                                     }
@@ -277,22 +210,9 @@ public class CommandApp {
 
                 }
             }
-            outputText.setText(response + "\n");
-            commandTextField.setText("");
+            gui.setOutputText(response + "\n");
+            gui.setCommand("");
         });
-
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        buttonsPanel.add(submitFileButton);
-        buttonsPanel.add(requestButton);
-
-        gbc.gridx = 0;
-        gbc.gridy = 3;
-        gbc.gridwidth = 2;
-        gbc.anchor = GridBagConstraints.CENTER;
-        panel.add(buttonsPanel, gbc);
-
-        frame.add(panel);
-        frame.setVisible(true);
     }
 
     private static SSLSocket initTLSSocket() {
@@ -334,7 +254,8 @@ public class CommandApp {
     }
 
     private static CommandReturn requestCommand(SSLSocket socket, String[] fullCommand, FilePayload filePayload)
-            throws Exception {
+            throws InvalidKeyException, ClassNotFoundException, InvalidAlgorithmParameterException, RuntimeException,
+            CryptoException {
         logger.severe("Requesting command: " + fullCommand[0]);
         Authenticator authenticator = null;
         byte[] authenticatorSerialized = null;
@@ -344,7 +265,7 @@ public class CommandApp {
         switch (fullCommand[0]) {
             case "ls", "mkdir":
                 if (fullCommand.length < 2 || fullCommand.length > 4)
-                    throw new InvalidCommandException(
+                    throw new RuntimeException(
                             "Command format should be: " + fullCommand[0] + " username path");
                 if (fullCommand.length == 2) {
                     command = new Command(fullCommand[0], clientId, "/");
@@ -354,20 +275,20 @@ public class CommandApp {
                 break;
             case "put":
                 if (fullCommand.length != 3)
-                    throw new InvalidCommandException(
+                    throw new RuntimeException(
                             "Command format should be: " + clientId + "username path/file");
                 logger.info("File payload: " + filePayload);
                 command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2]);
                 break;
             case "get", "rm":
                 if (fullCommand.length != 3)
-                    throw new InvalidCommandException(
+                    throw new RuntimeException(
                             "Command format should be: " + fullCommand[0] + "username path/file");
                 command = new Command(fullCommand[0], clientId, fullCommand[2]);
                 break;
             case "cp":
                 if (fullCommand.length != 4)
-                    throw new InvalidCommandException(
+                    throw new RuntimeException(
                             "Command format should be: " + fullCommand[0] + "username path1/file1 path2/file2");
 
                 command = new Command(fullCommand[0], clientId, filePayload, fullCommand[2], fullCommand[3]);
@@ -377,20 +298,24 @@ public class CommandApp {
                 // tripei? o stor é que tripo assinado:rosa
                 break;
             default:
-                throw new InvalidCommandException("Command '" + fullCommand[0] + "' is invalid");
+                throw new RuntimeException("Command '" + fullCommand[0] + "' is invalid");
         }
         // Request SGT from TGS
         authenticator = new Authenticator(clientId, CLIENT_ADDR, command);
 
         try {
-            authenticatorSerialized = serialize(authenticator);
+            authenticatorSerialized = Utils.serialize(authenticator);
 
             ResponseAuthenticationMessage tgt = mapUsers.get(clientId).getTGT();
-            sendTGSRequest(socket, tgt.getEncryptedTGT(),
-                    CryptoStuff.getInstance()
-                            .encrypt(tgt.getGeneratedKey(),
-                                    authenticatorSerialized),
-                    command);
+            try {
+                sendTGSRequest(socket, tgt.getEncryptedTGT(),
+                        CryptoStuff.getInstance()
+                                .encrypt(tgt.getGeneratedKey(),
+                                        authenticatorSerialized),
+                        command);
+            } catch (InvalidAlgorithmParameterException | CryptoException e) {
+                e.printStackTrace();
+            }
 
             mapUsers.get(clientId).addSGT(commandString,
                     processTGSResponse(socket, tgt.getGeneratedKey()));
@@ -407,14 +332,14 @@ public class CommandApp {
 
             return processResponse(wrapper, sgt.getSessionKey(), clientId, commandString);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         return null;
     }
 
     private static CommandReturn processResponse(Wrapper wrapper, SecretKey sessionKey, String clientId, String command)
-            throws Exception {
+            throws RuntimeException, IOException, ClassNotFoundException, InvalidKeyException,
+            InvalidAlgorithmParameterException, CryptoException {
         logger.info("Processing service response status");
         MessageStatus status = MessageStatus.fromCode(wrapper.getStatus());
 
@@ -423,21 +348,22 @@ public class CommandApp {
             case OK, OK_NO_CONTENT:
                 byte[] encryptedResponse = wrapper.getMessage();
                 byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(sessionKey, encryptedResponse);
-                return ((ResponseServiceMessage) deserialize(decryptedResponse)).getcommandReturn();
+                return ((ResponseServiceMessage) Utils.deserialize(decryptedResponse)).getcommandReturn();
             case BAD_REQUEST:
-                throw new InvalidCommandException("Command '" + command + "' is invalid");
+                throw new RuntimeException("Command '" + command + "' is invalid");
             case UNAUTHORIZED:
-                throw new UserNotFoundException(clientId);
+                throw new RuntimeException("User '" + clientId + "' is not authorized to execute command '" + command
+                        + "'. Authenticate user with command: login username password");
             case FORBIDDEN:
-                throw new ForbiddenException();
+                throw new RuntimeException("User '" + clientId + "' is not authorized to execute command '" + command);
             case NOT_FOUND:
-                throw new NotFoundException();
+                throw new RuntimeException("File not found");
             case INTERNAL_SERVER_ERROR:
-                throw new InternalServerErrorException();
+                throw new RuntimeException("Internal server error");
             case CONFLICT:
-                throw new Exception("Conflict");
+                throw new RuntimeException("File already exists");
             default:
-                throw new Exception("Error processing response");
+                throw new RuntimeException("Unknown error");
         }
     }
 
@@ -451,7 +377,7 @@ public class CommandApp {
                     TGS_ID);
 
             byte[] encryptedRequestMessge = CryptoStuff.getInstance().encrypt(mapUsers.get(clientId).getDhKey(),
-                    serialize(requestMessage));
+                    Utils.serialize(requestMessage));
 
             // Create wrapper object with serialized request message for auth and its type
             Wrapper wrapper = new Wrapper((byte) 1, encryptedRequestMessge, UUID.randomUUID());
@@ -474,7 +400,7 @@ public class CommandApp {
 
             RequestTGSMessage requestMessage = new RequestTGSMessage(SERVICE_ID, encryptedTGT, encryptedAuthenticator);
 
-            byte[] requestMessageSerialized = serialize(requestMessage);
+            byte[] requestMessageSerialized = Utils.serialize(requestMessage);
 
             // Create wrapper object with serialized request message for auth and its type
             Wrapper wrapper = new Wrapper((byte) 3, requestMessageSerialized, UUID.randomUUID());
@@ -497,11 +423,11 @@ public class CommandApp {
             Authenticator authenticator = new Authenticator(command.getUsername(), CLIENT_ADDR);
             byte[] encryptedAuthenticator = CryptoStuff.getInstance().encrypt(
                     sgt.getSessionKey(),
-                    serialize(authenticator));
+                    Utils.serialize(authenticator));
 
             RequestServiceMessage requestServiceMessage = new RequestServiceMessage(sgt.getSgt(),
                     encryptedAuthenticator, command);
-            byte[] requestMessageSerialized = serialize(requestServiceMessage);
+            byte[] requestMessageSerialized = Utils.serialize(requestServiceMessage);
 
             // Create wrapper object with serialized request message for auth and its type
             Wrapper wrapper = new Wrapper((byte) 6, requestMessageSerialized, UUID.randomUUID());
@@ -519,22 +445,25 @@ public class CommandApp {
         logger.severe("Processing auth response for client: " + clientId);
         ResponseAuthenticationMessage responseAuthenticationMessage = null;
         try {
+
             // Communication logic with the server
             ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-
+            logger.info("Waiting for auth response");
             Wrapper wrapper = (Wrapper) ois.readObject();
             MessageStatus responseStatus = MessageStatus.fromCode(wrapper.getStatus());
+            logger.info("Response status: " + responseStatus);
             switch (responseStatus) {
                 case OK:
                     byte[] encryptedResponse = wrapper.getMessage();
                     try {
                         SecretKey clientKey = mapUsers.get(clientId).getKeyPassword();
                         byte[] descryptedResponse = CryptoStuff.getInstance().decrypt(clientKey, encryptedResponse);
-                        responseAuthenticationMessage = (ResponseAuthenticationMessage) deserialize(descryptedResponse);
+                        responseAuthenticationMessage = (ResponseAuthenticationMessage) Utils
+                                .deserialize(descryptedResponse);
+                        return responseAuthenticationMessage;
                     } catch (CryptoException e) {
                         throw new IncorrectPasswordException("This password is incorrect.");
                     }
-                    break;
                 case UNAUTHORIZED:
                     throw new UserNotFoundException(clientId);
                 default:
@@ -562,7 +491,7 @@ public class CommandApp {
             byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(key, encryptedResponse);
 
             logger.info("Attempting to deserialize TGS response");
-            responseTGSMessage = (ResponseTGSMessage) deserialize(decryptedResponse);
+            responseTGSMessage = (ResponseTGSMessage) Utils.deserialize(decryptedResponse);
 
             logger.info("Finished processing TGS response");
         } catch (Exception e) {
@@ -585,7 +514,7 @@ public class CommandApp {
             SecretKey clientServiceKey = responseTGSMessage.getSessionKey();
             byte[] decryptedResponse = CryptoStuff.getInstance().decrypt(clientServiceKey, encryptedResponse);
 
-            responseServiceMessage = (ResponseServiceMessage) deserialize(decryptedResponse);
+            responseServiceMessage = (ResponseServiceMessage) Utils.deserialize(decryptedResponse);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -668,21 +597,5 @@ public class CommandApp {
             e.printStackTrace();
         }
         return null;
-    }
-
-    private static byte[] serialize(Object object) throws IOException {
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
-            objectOutputStream.writeObject(object);
-            objectOutputStream.flush();
-            return byteArrayOutputStream.toByteArray();
-        }
-    }
-
-    private static Object deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
-        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-                ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
-            return objectInputStream.readObject();
-        }
     }
 }

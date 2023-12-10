@@ -1,4 +1,4 @@
-package org.example.utils;
+package org.example.messages;
 
 import org.example.crypto.CryptoException;
 import org.example.crypto.CryptoStuff;

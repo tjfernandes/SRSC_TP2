@@ -1,4 +1,4 @@
-package org.example.utils;
+package org.example.messages;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -38,11 +38,11 @@ public class RequestAuthenticationMessage implements Serializable {
 
     @Override
     public String toString() {
-    return "RequestMessage{" +
-            "clientId='" + clientId + '\'' +
-            ", serviceId='" + serviceId + '\'' +
-            ", clientAddress='" + clientAddress + '\'' +
-            ", timestamp=" + timestamp +
-            '}';
+        return "RequestMessage{" +
+                "clientId='" + clientId + '\'' +
+                ", serviceId='" + serviceId + '\'' +
+                ", clientAddress='" + clientAddress + '\'' +
+                ", timestamp=" + timestamp +
+                '}';
     }
 }
