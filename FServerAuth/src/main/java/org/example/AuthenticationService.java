@@ -233,6 +233,7 @@ public class AuthenticationService {
             if (key == null) {
                 objectOutputStream.writeObject(new Wrapper((byte) 1, null, uuid, UNAUTHORIZED));
                 objectOutputStream.flush();
+                logger.warning("Unauthorized user");
                 return;
             }
             SecretKey secretKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(key);
