@@ -70,7 +70,7 @@ public class CommandApp {
 
     static {
         try (InputStream input = CommandApp.class.getClassLoader()
-                .getResourceAsStream("/app/tls-config.properties")) {
+                .getResourceAsStream("tls-config.properties")) {
             properties.load(input);
         } catch (IOException ex) {
             ex.printStackTrace();
