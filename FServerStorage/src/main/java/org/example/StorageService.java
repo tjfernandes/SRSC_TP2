@@ -24,6 +24,7 @@ import org.example.crypto.CryptoStuff;
 import org.example.utils.Authenticator;
 import org.example.utils.Command;
 import org.example.utils.CommandReturn;
+import org.example.utils.MessageStatus;
 import org.example.utils.RequestServiceMessage;
 import org.example.utils.ResponseServiceMessage;
 import org.example.utils.ServiceGrantingTicket;
@@ -33,8 +34,6 @@ import org.example.utils.Pair;
 
 public class StorageService {
 
-    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
-    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
     public static final String KEYSTORE_PASSWORD = "storage_password";
     public static final String KEYSTORE_PATH = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD = "storage_truststore_password";
@@ -52,6 +51,20 @@ public class StorageService {
     enum CommandEnum {
         GET, PUT, RM, LS, MKDIR, CP, FILE
     }
+
+    private static final Properties properties = new Properties();
+
+    static {
+        try (FileInputStream input = new FileInputStream("/app/tls-config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static final String[] TLS_PROT_ENF = properties.getProperty("TLS-PROT-ENF").split(",");
+    public static final String[] CIPHERSUITES = properties.getProperty("CIPHERSUITES").split(",");
+    public static final String TLS_AUTH = properties.getProperty("TLS-AUTH");
 
     // Custom logger to print the timestamp in milliseconds
     public static final Logger logger = Logger.getLogger(StorageService.class.getName());
@@ -85,7 +98,7 @@ public class StorageService {
     public static void main(String[] args) {
 
         // Set logger level
-        logger.setLevel(Level.SEVERE);
+        logger.setLevel(Level.INFO);
 
         final SSLServerSocket serverSocket = server();
         FsManager fsManager = new FsManager();
@@ -112,7 +125,6 @@ public class StorageService {
                 logger.warning("Connection timed out.");
             }
         }
-
     }
 
     // Process the command and returns the payload and the code
@@ -147,7 +159,7 @@ public class StorageService {
                 code = fsManager.cpCommand(clientId, command.getPath(), command.getCpToPath());
                 break;
             case FILE:
-                pair = fsManager.getCommand(clientId, command.getPath());
+                pair = fsManager.fileCommand(clientId, command.getPath());
                 payload = pair.first;
                 code = pair.second;
                 break;
@@ -206,16 +218,11 @@ public class StorageService {
 
         LocalDateTime returnTime = authenticator.getTimestamp().plusNanos(1);
         Command command = sgt.getCommand();
+
         // Checking if the Authenticator is valid
         if (!authenticator.isValid(sgt.getClientId(), sgt.getClientAddress())) {
             return new Pair<>(crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(
-                    new CommandReturn(command), returnTime))), 400);
-        }
-
-        // Checking if the command is valid
-        if (!command.isValid()) {
-            return new Pair<>(crypto.encrypt(sgt.getKey(), serialize(new ResponseServiceMessage(
-                    new CommandReturn(command), returnTime))), 400);
+                    new CommandReturn(command), returnTime))), MessageStatus.UNAUTHORIZED.getCode());
         }
 
         String userId = sgt.getClientId();
@@ -249,8 +256,10 @@ public class StorageService {
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-            serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            serverSocket.setEnabledProtocols(TLS_PROT_ENF);
+            serverSocket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH.equals("MUTUAL");
+            serverSocket.setNeedClientAuth(needAuth);
 
             return serverSocket;
 

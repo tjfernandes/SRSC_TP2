@@ -33,6 +33,7 @@ import org.example.Crypto.CryptoException;
 import org.example.Crypto.CryptoStuff;
 import org.example.utils.Authenticator;
 import org.example.utils.Command;
+import org.example.utils.MessageStatus;
 import org.example.utils.RequestTGSMessage;
 import org.example.utils.ResponseTGSMessage;
 import org.example.utils.ServiceGrantingTicket;
@@ -44,8 +45,6 @@ import java.time.LocalDateTime;
 
 public class AccessControlService {
 
-    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
-    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
     public static final String KEYSTORE_PASSWORD = "access_control_password";
     public static final String KEYSTORE_PATH = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD = "access_control_truststore_password";
@@ -64,6 +63,20 @@ public class AccessControlService {
 
     private static SSLServerSocket serverSocket;
     private static AccessControl accessControl;
+
+    private static final Properties properties = new Properties();
+
+    static {
+        try (FileInputStream input = new FileInputStream("/app/tls-config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static final String[] TLS_PROT_ENF = properties.getProperty("TLS-PROT-ENF").split(",");
+    public static final String[] CIPHERSUITES = properties.getProperty("CIPHERSUITES").split(",");
+    public static final String TLS_AUTH = properties.getProperty("TLS-AUTH");
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(AccessControlService.class.getName());
@@ -151,8 +164,10 @@ public class AccessControlService {
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             serverSocket = (SSLServerSocket) sslServerSocketFactory
                     .createServerSocket(PORT_2_DISPATCHER);
-            serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            serverSocket.setEnabledProtocols(TLS_PROT_ENF);
+            serverSocket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH.equals("MUTUAL");
+            serverSocket.setNeedClientAuth(needAuth);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -185,7 +200,8 @@ public class AccessControlService {
 
             // check if authenticator is valid
             if (!authenticator.isValid(tgt.getClientId(), tgt.getClientAddress())) {
-                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(), 401);
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(),
+                        MessageStatus.UNAUTHORIZED.getCode());
                 objectOutputStream.writeObject(errorWrapper);
                 objectOutputStream.flush();
                 objectOutputStream.close();
@@ -197,7 +213,20 @@ public class AccessControlService {
 
             // check if the user has permissions for this command
             if (!accessControl.hasPermission(authenticator.getClientId(), command.getCommand())) {
-                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(), 401);
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(),
+                        MessageStatus.UNAUTHORIZED.getCode());
+                objectOutputStream.writeObject(errorWrapper);
+                objectOutputStream.flush();
+                objectOutputStream.close();
+                objectInputStream.close();
+                requestSocket.close();
+                return;
+            }
+
+            // Checking if the command is valid
+            if (!command.isValid()) {
+                Wrapper errorWrapper = new Wrapper((byte) 4, null, wrapper.getMessageId(),
+                        MessageStatus.FORBIDDEN.getCode());
                 objectOutputStream.writeObject(errorWrapper);
                 objectOutputStream.flush();
                 objectOutputStream.close();
@@ -226,7 +255,8 @@ public class AccessControlService {
             msgSerialized = CryptoStuff.getInstance().encrypt(keyClientTGS, msgSerialized);
 
             // create wrapper message
-            Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, wrapper.getMessageId(), 204);
+            Wrapper wrapperMessage = new Wrapper((byte) 4, msgSerialized, wrapper.getMessageId(),
+                    MessageStatus.OK_NO_CONTENT.getCode());
 
             // send wrapper message
             objectOutputStream.writeObject(wrapperMessage);

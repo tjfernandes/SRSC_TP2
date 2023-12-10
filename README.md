@@ -36,3 +36,20 @@ To run the application using Docker Compose with the `-d` (detached) option, fol
     ```bash
     /bin/bash build_and_run.sh
     ```
+
+
+## Pre installed users
+
+username: client, password:12345, permissions:rw
+username: alice, password:12345, permissions:r
+
+## Some commands to exemplifie
+
+login client 12345
+put client /ola.txt (you need to click on the button and submit a file)
+get client /ola.txt
+get client ola.txt
+mkdir client /pasta
+mkdir client pasta/
+ls client
+file client ola.txt

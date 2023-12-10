@@ -8,6 +8,7 @@ COPY src/main/resources/dispatcher.cer dispatcher.cer
 COPY src/main/resources/access_control.cer access_control.cer
 COPY src/main/resources/keys.properties keys.properties
 COPY src/main/resources/access.conf access.conf
+COPY src/main/resources/tls-config.properties tls-config.properties
 
 EXPOSE 8082
 

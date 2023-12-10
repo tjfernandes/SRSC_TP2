@@ -45,13 +45,11 @@ import org.example.utils.Wrapper;
 
 public class AuthenticationService {
 
-    public static final String[] CONFPROTOCOLS = { "TLSv1.2" };;
-    public static final String[] CONFCIPHERSUITES = { "TLS_RSA_WITH_AES_256_CBC_SHA256" };
+    public static final String TLS_VERSION = "TLSv1.2";
     public static final String KEYSTORE_PASSWORD = "authentication_password";
     public static final String KEYSTORE_PATH = "/app/keystore.jks";
     public static final String TRUSTSTORE_PASSWORD = "authentication_truststore_password";
     public static final String TRUSTSTORE_PATH = "/app/truststore.jks";
-    public static final String TLS_VERSION = "TLSv1.2";
     public static final int PORT_2_DISPATCHER = 8080;
     public static final int MY_PORT = 8081;
 
@@ -66,6 +64,19 @@ public class AuthenticationService {
     private static SecretKey keyTGT = null;
 
     private static final long TIMEOUT = 10000;
+    private static final Properties properties = new Properties();
+
+    static {
+        try (FileInputStream input = new FileInputStream("/app/tls-config.properties")) {
+            properties.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public static final String[] TLS_PROT_ENF = properties.getProperty("TLS-PROT-ENF").split(",");
+    public static final String[] CIPHERSUITES = properties.getProperty("CIPHERSUITES").split(",");
+    public static final String TLS_AUTH = properties.getProperty("TLS-AUTH");
 
     // Custom logger to print the timestamp in milliseconds
     private static final Logger logger = Logger.getLogger(AuthenticationService.class.getName());
@@ -104,8 +115,6 @@ public class AuthenticationService {
 
         Authentication authentication = new Authentication();
         dhKey = null;
-        // Register a user
-        // authentication.register("client", "12345");
 
         final SSLServerSocket serverSocket = server();
         System.out.println("Server started on port " + MY_PORT);
@@ -222,6 +231,7 @@ public class AuthenticationService {
             if (key == null) {
                 objectOutputStream.writeObject(new Wrapper((byte) 1, null, uuid, UNAUTHORIZED));
                 objectOutputStream.flush();
+                logger.warning("Unauthorized user");
                 return;
             }
             SecretKey secretKey = CryptoStuff.getInstance().convertByteArrayToSecretKey(key);
@@ -259,8 +269,10 @@ public class AuthenticationService {
             sslContext.init(kmf.getKeyManagers(), trustManagerFactory.getTrustManagers(), new SecureRandom());
             SSLServerSocketFactory sslServerSocketFactory = sslContext.getServerSocketFactory();
             SSLServerSocket serverSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(MY_PORT);
-            serverSocket.setEnabledProtocols(CONFPROTOCOLS);
-            serverSocket.setEnabledCipherSuites(CONFCIPHERSUITES);
+            serverSocket.setEnabledProtocols(TLS_PROT_ENF);
+            serverSocket.setEnabledCipherSuites(CIPHERSUITES);
+            boolean needAuth = TLS_AUTH.equals("MUTUAL");
+            serverSocket.setNeedClientAuth(needAuth);
 
             return serverSocket;
 
